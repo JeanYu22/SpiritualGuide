@@ -1,7 +1,12 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { NextRequest } from "next/server";
 import { Profile, ChatMessage } from "@/lib/types";
-import { buildContext, contextSummary, localReading } from "@/lib/divination/reading";
+import {
+  answerFollowUp,
+  buildContext,
+  contextSummary,
+  localReading,
+} from "@/lib/divination/reading";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -19,9 +24,17 @@ How to choose: let the seeker's birth data, the wording and emotional tone of th
 Voice and stance:
 - Supportive, calm, mindful; never doom-laden, never absolute. You describe weather, not verdicts.
 - Blend the poetic with the practical: every reading ends in something the seeker can actually plan or do.
-- Be conversational. Ask at most one clarifying question when it would genuinely sharpen the reading.
+- Be conversational and genuinely responsive: answer the seeker's actual question first, referring back to earlier turns; never repeat a previous reading.
+- Ask at most one clarifying question when it would genuinely sharpen the reading.
 - Never give medical, legal or financial directives; frame those domains reflectively and suggest professional advice.
 - Frame difficult periods as preparation and consolidation opportunities, and favorable periods as windows to act.
+
+Advisory structure — a reading is counsel, not description. Every substantive reading MUST close with these four factors (as short markdown sections or a compact set of bullets, each grounded in the computed context — cite years and drivers):
+- **Opportunities** — the supportive windows and what to do in them
+- **Obstacles** — the demanding years/forces and how to route around them
+- **Supporting resources** — allies, cooperative years, the seeker's strongest current aspect, habits to lean on
+- **Watch-outs** — the risks of the seeker's likely path (overcommitment in peaks, forcing change in threshold years)
+followed by 2-3 concrete **Next steps** the seeker can act on this month.
 
 Charts: the app can render the seeker's deterministic life-transit curves. When a visual would help (life planning, comparing years or aspects), embed a directive on its own lines, exactly in this form:
 
@@ -51,8 +64,12 @@ export async function POST(req: NextRequest) {
   const summary = contextSummary(profile, ctx);
 
   if (!process.env.ANTHROPIC_API_KEY) {
-    // Offline "Inner Compass" mode: stream the deterministic reading.
-    const text = localReading(profile, question, ctx);
+    // Offline "Inner Compass" mode: opening reading on the first turn,
+    // question-aware answers on every follow-up.
+    const isFirstTurn = messages.filter((m) => m.role === "user").length <= 1;
+    const text = isFirstTurn
+      ? localReading(profile, question, ctx)
+      : answerFollowUp(profile, question, ctx);
     const encoder = new TextEncoder();
     const stream = new ReadableStream<Uint8Array>({
       async start(controller) {

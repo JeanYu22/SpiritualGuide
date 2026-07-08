@@ -15,7 +15,12 @@ a deliberate mix of the spiritual and the scientific, with a supportive, mindful
    - a ten-year **transit map**: per-aspect supportiveness curves (career, wealth,
      relationships, health, growth) blended from the 9-year, 12-year branch-relation
      and 7-year renewal cycles — rendered as an interactive SVG chart with hover
-     tooltips, aspect toggles and a current-year marker.
+     tooltips, aspect toggles and a current-year marker. **Critical transition
+     points** (supportive windows, consolidation years, momentum turns, threshold
+     years) are marked on the curves; hovering a marker explains *what* it is,
+     *why* it happens (which cycle drives it) and *how to use it*. The crosshair
+     tooltip names the drivers behind any hovered year, and a "What moves these
+     curves?" panel explains the three-cycle model.
    - an **I-Ching hexagram** cast for the moment of arrival (full 64-hexagram
      King Wen resolution with changing lines).
 3. **Oracle chat (interpretive lens)** — a streaming conversation with an AI agent
@@ -24,7 +29,11 @@ a deliberate mix of the spiritual and the scientific, with a supportive, mindful
    Western astrology or numerology — based on the birth data, the wording and timing
    of the question, and any numbers mentioned. The agent is grounded in the app's
    computed context and can embed chart directives (```chart fences) that the client
-   renders as live transit charts.
+   renders as live transit charts. Every substantive reading closes with structured
+   counsel — **opportunities, obstacles, supporting resources and watch-outs** —
+   plus concrete next steps. In offline mode a question-aware follow-up engine
+   answers timing questions ("when is a good window for…"), specific-year questions
+   and aspect deep-dives from the deterministic model.
 
 ## Running it
 

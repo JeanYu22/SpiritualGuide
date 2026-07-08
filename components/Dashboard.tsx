@@ -35,15 +35,18 @@ export default function Dashboard({ profile }: { profile: Profile }) {
     <div className="card">
       <h2>Your life map</h2>
       <p className="sub">
-        The systematic lens — nine-year, twelve-year and seven-year rhythms blended into one
-        supportiveness curve per life aspect. Weather, not verdicts.
+        Nine-, twelve- and seven-year rhythms blended into one supportiveness curve per life
+        aspect — with your critical transition points marked. Weather, not verdicts.
       </p>
 
       <div className="profile-facts">
         <div className="fact">
           <div className="k">Year pillar</div>
           <div className="v">{ctx.natal.label.replace(/\s*\(.*\)/, "")}</div>
-          <div className="note">{ctx.natal.stem}{ctx.natal.branch} · born {profile.birthDate}</div>
+          <div className="note">
+            {ctx.natal.stem}
+            {ctx.natal.branch} · born {profile.birthDate}
+          </div>
         </div>
         <div className="fact">
           <div className="k">Life path</div>
@@ -76,12 +79,35 @@ export default function Dashboard({ profile }: { profile: Profile }) {
         series={series}
         title={`Supportiveness by year, ${startYear}–${endYear}`}
         currentYear={ctx.currentYear}
+        birthDate={profile.birthDate}
       />
 
-      <div style={{ marginTop: 20, paddingTop: 16, borderTop: "1px solid var(--border)" }}>
-        <p className="sub" style={{ marginBottom: 10 }}>
-          The symbolic lens — cast at the moment you arrived:
-        </p>
+      <details className="explainer">
+        <summary>What moves these curves?</summary>
+        <div className="body">
+          Each year&apos;s score blends three deterministic cycles computed from your birth date —
+          hover any year or marker on the chart to see which one dominates:
+          <ul>
+            <li>
+              <strong>The nine-year personal cycle</strong> (numerology): seed → growth → harvest →
+              release. Each aspect thrives in different phases — career peaks in years 1 and 8,
+              relationships in 2 and 6, inner growth in 7.
+            </li>
+            <li>
+              <strong>The twelve-year branch cycle</strong> (Chinese metaphysics): how each year&apos;s
+              animal sign relates to yours — harmony-triangle and combination years lift the
+              curves; clash, harm and own-sign years pull them down and mark thresholds.
+            </li>
+            <li>
+              <strong>The seven-year renewal rhythm</strong>: a slow bodily and energetic tide
+              anchored to your age, phase-shifted per aspect.
+            </li>
+          </ul>
+        </div>
+      </details>
+
+      <div className="hex-panel">
+        <p className="sub">The symbolic lens — cast at the moment you arrived:</p>
         <Hexagram cast={ctx.cast} />
       </div>
     </div>

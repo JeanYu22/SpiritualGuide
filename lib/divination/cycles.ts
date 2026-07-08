@@ -6,14 +6,15 @@
  *   2. the twelve-year earthly-branch cycle (trine / clash / combine / harm)
  *   3. a seven-year renewal rhythm anchored to age
  *
- * The output is a smooth, reproducible curve: the "systematic" lens the app
- * pairs with the oracle's interpretive reading. It highlights supportive
- * windows and threshold years rather than predicting events.
+ * Every score is explainable: `aspectScoreDetail` exposes how much each cycle
+ * contributes to a given year, and `transitionPoints` finds the critical
+ * turning points (peaks, troughs, surges, threshold years) with a plain
+ * "what / why / how to use it" narrative for each.
  */
 
 import { ASPECTS, AspectId, TransitSeries } from "../types";
-import { personalYear } from "./numerology";
-import { branchRelation, BranchRelation, effectiveYear } from "./bazi";
+import { personalYear, PERSONAL_YEAR_THEMES } from "./numerology";
+import { branchRelation, BranchRelation, effectiveYear, RELATION_NOTES, yearPillar } from "./bazi";
 import { hashString, mulberry32 } from "./iching";
 
 // affinity of each aspect with each personal year number (1-9), in [-1, 1]
@@ -26,7 +27,7 @@ const PY_AFFINITY: Record<AspectId, number[]> = {
   growth: /*    */ [0.6, 0.3, 0.7, 0.1, 0.5, 0.0, 1.0, 0.2, 0.4],
 };
 
-// how strongly each aspect feels the branch relation, in [-1, 1]
+// how strongly each aspect feels the branch relation, in [0, 1]
 const RELATION_VALUE: Record<BranchRelation, number> = {
   self: -0.55,
   trine: 0.8,
@@ -44,11 +45,6 @@ const RELATION_WEIGHT: Record<AspectId, number> = {
   growth: 0.5,
 };
 
-function sevenYearPhase(age: number, offset: number): number {
-  // gentle sine over a 7-year renewal rhythm, aspect-shifted
-  return Math.sin(((age + offset) / 7) * Math.PI * 2) * 0.5;
-}
-
 const SEVEN_OFFSET: Record<AspectId, number> = {
   career: 0,
   wealth: 1.5,
@@ -57,13 +53,34 @@ const SEVEN_OFFSET: Record<AspectId, number> = {
   growth: 6,
 };
 
-export function aspectScore(birthDate: string, aspect: AspectId, year: number): number {
+function sevenYearPhase(age: number, offset: number): number {
+  return Math.sin(((age + offset) / 7) * Math.PI * 2) * 0.5;
+}
+
+export interface DriverDetail {
+  /** contribution of this driver to the final 0-100 score (signed points) */
+  points: number;
+  label: string;
+}
+
+export interface ScoreDetail {
+  year: number;
+  aspect: AspectId;
+  value: number;
+  personalYear: DriverDetail & { number: number };
+  branch: DriverDetail & { relation: BranchRelation };
+  rhythm: DriverDetail;
+  /** one-line explanation of the strongest force this year */
+  dominant: string;
+}
+
+export function aspectScoreDetail(birthDate: string, aspect: AspectId, year: number): ScoreDetail {
   const [by, bm, bd] = birthDate.split("-").map(Number);
   const natalYear = effectiveYear(new Date(by, bm - 1, bd));
   const age = year - by;
 
   const py = personalYear(birthDate, year);
-  const a = PY_AFFINITY[aspect][py - 1]; // [-0.5, 1]
+  const a = PY_AFFINITY[aspect][py - 1];
 
   const rel = branchRelation(natalYear, year);
   const r = RELATION_VALUE[rel] * RELATION_WEIGHT[aspect];
@@ -75,10 +92,51 @@ export function aspectScore(birthDate: string, aspect: AspectId, year: number): 
   const phase = rnd() * Math.PI * 2;
   const p = Math.sin((year / 4.2) * Math.PI * 2 + phase) * 0.18;
 
-  // weighted blend -> 0-100
-  const raw = a * 0.42 + r * 0.33 + s * 0.18 + p * 0.07;
-  const score = 50 + raw * 45;
-  return Math.round(Math.min(96, Math.max(6, score)) * 10) / 10;
+  const pyPts = a * 0.42 * 45;
+  const brPts = r * 0.33 * 45;
+  const ryPts = (s * 0.18 + p * 0.07) * 45;
+  const score = Math.round(Math.min(96, Math.max(6, 50 + pyPts + brPts + ryPts)) * 10) / 10;
+
+  const pillar = yearPillar(year);
+  const pyTheme = PERSONAL_YEAR_THEMES[py].split(" — ")[0];
+  const drivers = [
+    {
+      key: "py",
+      pts: pyPts,
+      line: `personal year ${py} (${pyTheme}) ${pyPts >= 0 ? "lifts" : "asks patience of"} this aspect`,
+    },
+    {
+      key: "br",
+      pts: brPts,
+      line: `${pillar.animal} year: ${RELATION_NOTES[rel].split(" — ")[0]}`,
+    },
+    { key: "ry", pts: ryPts, line: `the seven-year body-and-energy rhythm runs ${ryPts >= 0 ? "high" : "low"}` },
+  ].sort((x, y) => Math.abs(y.pts) - Math.abs(x.pts));
+
+  return {
+    year,
+    aspect,
+    value: score,
+    personalYear: {
+      number: py,
+      points: Math.round(pyPts * 10) / 10,
+      label: `Personal year ${py} — ${pyTheme}`,
+    },
+    branch: {
+      relation: rel,
+      points: Math.round(brPts * 10) / 10,
+      label: `${pillar.animal} year — ${rel === "neutral" ? "neutral to your sign" : RELATION_NOTES[rel].split(" — ")[0]}`,
+    },
+    rhythm: {
+      points: Math.round(ryPts * 10) / 10,
+      label: `Seven-year rhythm ${ryPts >= 0 ? "rising" : "resting"}`,
+    },
+    dominant: drivers[0].line,
+  };
+}
+
+export function aspectScore(birthDate: string, aspect: AspectId, year: number): number {
+  return aspectScoreDetail(birthDate, aspect, year).value;
 }
 
 export function transitSeries(
@@ -102,30 +160,141 @@ export function transitSeries(
     }));
 }
 
-export interface YearHighlight {
+/* ------------------------------------------------------------------ */
+/* Critical transition points                                          */
+/* ------------------------------------------------------------------ */
+
+export type TransitionKind = "peak" | "trough" | "surge" | "drop" | "threshold";
+
+export interface TransitionPoint {
   year: number;
-  aspect: AspectId;
-  kind: "peak" | "threshold";
-  score: number;
+  /** null = a whole-life threshold year (affects every aspect) */
+  aspect: AspectId | null;
+  aspectName?: string;
+  slot?: number;
+  kind: TransitionKind;
+  value?: number;
+  title: string;
+  why: string;
+  advice: string;
 }
 
-/** Best supportive window and most demanding threshold per aspect in a range. */
-export function highlights(
+const KIND_TITLE: Record<Exclude<TransitionKind, "threshold">, string> = {
+  peak: "Supportive window",
+  trough: "Consolidation year",
+  surge: "Momentum turns upward",
+  drop: "The tide turns",
+};
+
+const KIND_ADVICE: Record<Exclude<TransitionKind, "threshold">, string> = {
+  peak: "Act here: launch, commit, negotiate, expand. Prepare in the year before so you arrive ready.",
+  trough: "Not misfortune — a season to consolidate. Repair, rest, study, save; avoid forcing big leaps.",
+  surge: "Start positioning now: groundwork laid in this year compounds through the rise that follows.",
+  drop: "Finish and secure what matters before this year; enter it with reserves and flexible plans.",
+};
+
+function whyFor(detail: ScoreDetail): string {
+  const parts: string[] = [];
+  if (Math.abs(detail.personalYear.points) >= 4) {
+    parts.push(detail.personalYear.label.toLowerCase());
+  }
+  if (Math.abs(detail.branch.points) >= 4) {
+    parts.push(detail.branch.label.toLowerCase());
+  }
+  if (parts.length === 0) parts.push(detail.rhythm.label.toLowerCase());
+  return parts.join("; ");
+}
+
+/**
+ * Finds the critical transition points for the given aspects and range:
+ * per-aspect local peaks/troughs and the steepest rises/falls, plus
+ * whole-life threshold years (own-sign and clash years).
+ */
+export function transitionPoints(
   birthDate: string,
+  aspects: AspectId[],
   startYear: number,
   endYear: number
-): YearHighlight[] {
-  const out: YearHighlight[] = [];
-  for (const a of ASPECTS) {
-    let best = { year: startYear, score: -1 };
-    let worst = { year: startYear, score: 101 };
-    for (let y = startYear; y <= endYear; y++) {
-      const s = aspectScore(birthDate, a.id, y);
-      if (s > best.score) best = { year: y, score: s };
-      if (s < worst.score) worst = { year: y, score: s };
+): TransitionPoint[] {
+  const [by, bm, bd] = birthDate.split("-").map(Number);
+  const natalYear = effectiveYear(new Date(by, bm - 1, bd));
+  const out: TransitionPoint[] = [];
+  const ids = aspects.length ? aspects : ASPECTS.map((a) => a.id);
+
+  for (const id of ids) {
+    const meta = ASPECTS.find((a) => a.id === id);
+    if (!meta) continue;
+    const details = Array.from({ length: endYear - startYear + 1 }, (_, i) =>
+      aspectScoreDetail(birthDate, id, startYear + i)
+    );
+    const values = details.map((d) => d.value);
+
+    let peakI = 0;
+    let troughI = 0;
+    values.forEach((v, i) => {
+      if (v > values[peakI]) peakI = i;
+      if (v < values[troughI]) troughI = i;
+    });
+
+    let surgeI = -1;
+    let dropI = -1;
+    for (let i = 1; i < values.length; i++) {
+      const d = values[i] - values[i - 1];
+      if (d >= 12 && (surgeI < 0 || d > values[surgeI] - values[surgeI - 1])) surgeI = i;
+      if (d <= -12 && (dropI < 0 || d < values[dropI] - values[dropI - 1])) dropI = i;
     }
-    out.push({ year: best.year, aspect: a.id, kind: "peak", score: best.score });
-    out.push({ year: worst.year, aspect: a.id, kind: "threshold", score: worst.score });
+
+    const used = new Set<number>();
+    const push = (i: number, kind: Exclude<TransitionKind, "threshold">) => {
+      if (i < 0 || used.has(i)) return;
+      used.add(i);
+      const det = details[i];
+      out.push({
+        year: det.year,
+        aspect: id,
+        aspectName: meta.name,
+        slot: meta.slot,
+        kind,
+        value: det.value,
+        title: `${KIND_TITLE[kind]} — ${meta.name}`,
+        why: whyFor(det),
+        advice: KIND_ADVICE[kind],
+      });
+    };
+    push(peakI, "peak");
+    push(troughI, "trough");
+    push(surgeI - 1, "surge"); // mark the year *before* the jump — where positioning happens
+    push(dropI - 1, "drop");
   }
-  return out;
+
+  // whole-life threshold years: own-sign and clash years touch every aspect
+  for (let y = startYear; y <= endYear; y++) {
+    const rel = branchRelation(natalYear, y);
+    if (rel === "self" || rel === "clash") {
+      const pillar = yearPillar(y);
+      out.push({
+        year: y,
+        aspect: null,
+        kind: "threshold",
+        title: rel === "self" ? `Own-sign year (${pillar.animal})` : `Clash year (${pillar.animal})`,
+        why: RELATION_NOTES[rel],
+        advice:
+          rel === "self"
+            ? "A threshold across all aspects: keep commitments deliberate, foundations tended, and changes well-prepared rather than impulsive."
+            : "Friction touches every aspect this year. Choose your changes early and lead them yourself — movement you initiate goes far better than movement forced on you.",
+      });
+    }
+  }
+
+  return out.sort((a, b) => a.year - b.year);
+}
+
+/** Convenience: the strongest opportunities and demands in a range, for readings. */
+export function keyMoments(birthDate: string, startYear: number, endYear: number) {
+  const pts = transitionPoints(birthDate, [], startYear, endYear);
+  return {
+    peaks: pts.filter((p) => p.kind === "peak"),
+    troughs: pts.filter((p) => p.kind === "trough"),
+    thresholds: pts.filter((p) => p.kind === "threshold"),
+  };
 }

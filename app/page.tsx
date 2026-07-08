@@ -31,8 +31,13 @@ export default function Home() {
     <div className="shell">
       <header className="topbar">
         <div className="brand">
-          <h1>SpiritualGuide</h1>
-          <span className="tagline">life-transit oracle</span>
+          <span className="mark" aria-hidden>
+            ☯
+          </span>
+          <div>
+            <h1>SpiritualGuide</h1>
+            <span className="tagline">life-transit oracle</span>
+          </div>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
           {profile && (
@@ -41,7 +46,7 @@ export default function Home() {
             </button>
           )}
           <button className="theme-toggle" onClick={toggleTheme} aria-label="Toggle theme">
-            ☾ / ☀
+            ☾ · ☀
           </button>
         </div>
       </header>
@@ -50,16 +55,52 @@ export default function Home() {
         <>
           <section className="hero">
             <div className="symbols" aria-hidden>
-              ☯ ✦ ☾ ᛟ ✧
+              ☰ ☱ ☲ ☳ ☴ ☵ ☶ ☷
             </div>
-            <h2>See the seasons of your life before you plan them</h2>
+            <h2>
+              See the <em>seasons of your life</em> before you plan them
+            </h2>
             <p>
-              An oracle that reads your question through I-Ching, Chinese metaphysics, Vedic
-              rhythm and numerology — then maps the same cycles as clear, systematic curves. So
-              you can prepare for threshold years, and act in the supportive ones.
+              An oracle that reads your question through ancient traditions, then maps the same
+              cycles as clear, systematic curves — so you can prepare for the threshold years and
+              act in the supportive ones.
             </p>
           </section>
-          <div className="card" style={{ maxWidth: 720, margin: "0 auto" }}>
+
+          <div className="lenses">
+            <div className="lens">
+              <div className="glyph" aria-hidden>
+                ☯
+              </div>
+              <h3>The symbolic lens</h3>
+              <p>
+                I-Ching hexagrams, Chinese year pillars, Vedic rhythm and numerology — the oracle
+                chooses the tradition that fits your question, and tells you why.
+              </p>
+            </div>
+            <div className="lens">
+              <div className="glyph" aria-hidden>
+                ◈
+              </div>
+              <h3>The systematic lens</h3>
+              <p>
+                Your nine-, twelve- and seven-year cycles rendered as transit curves, with every
+                critical transition point marked and explained.
+              </p>
+            </div>
+            <div className="lens">
+              <div className="glyph" aria-hidden>
+                ✦
+              </div>
+              <h3>The counsel</h3>
+              <p>
+                Every reading closes with opportunities, obstacles, supporting resources and
+                watch-outs — and concrete next steps you can plan around.
+              </p>
+            </div>
+          </div>
+
+          <div className="card begin-card">
             <h2>Begin</h2>
             <p className="sub">
               Your birth data stays in your browser and is used only to compute your reading.

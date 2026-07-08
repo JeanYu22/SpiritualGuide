@@ -119,6 +119,7 @@ function ChartEmbed({ directive, profile }: { directive: ChartDirective; profile
         title={directive.title}
         annotations={directive.annotations}
         currentYear={now}
+        birthDate={profile.birthDate}
       />
     </div>
   );
@@ -208,6 +209,7 @@ export default function ChatPanel({ profile }: { profile: Profile }) {
             </div>
           ) : (
             <div className="msg assistant" key={i}>
+              <div className="who">✦ Oracle</div>
               {m.content === "" && busy && i === messages.length - 1 ? (
                 <span className="typing">the oracle is contemplating</span>
               ) : (

@@ -1,13 +1,20 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { TransitSeries } from "@/lib/types";
+import { TransitSeries, AspectId } from "@/lib/types";
+import {
+  aspectScoreDetail,
+  transitionPoints,
+  TransitionPoint,
+} from "@/lib/divination/cycles";
 
 interface Props {
   series: TransitSeries[];
   title?: string;
   annotations?: { year: number; label: string }[];
   currentYear?: number;
+  /** when provided, the chart marks critical transition points and explains drivers on hover */
+  birthDate?: string;
 }
 
 /** Monotone cubic (Fritsch–Carlson) path — smooth without overshooting the data. */
@@ -25,7 +32,6 @@ function smoothPath(pts: { x: number; y: number }[]): string {
     m.push(d[i - 1] * d[i] <= 0 ? 0 : (d[i - 1] + d[i]) / 2);
   }
   m.push(d[n - 2]);
-  // limit tangents so the curve stays monotone between points
   for (let i = 0; i < n - 1; i++) {
     if (d[i] === 0) {
       m[i] = 0;
@@ -53,11 +59,18 @@ function smoothPath(pts: { x: number; y: number }[]): string {
   return path;
 }
 
-export default function TransitChart({ series, title, annotations = [], currentYear }: Props) {
+export default function TransitChart({
+  series,
+  title,
+  annotations = [],
+  currentYear,
+  birthDate,
+}: Props) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const [hoverYear, setHoverYear] = useState<number | null>(null);
   const [tipPos, setTipPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [marker, setMarker] = useState<TransitionPoint | null>(null);
   const [W, setW] = useState(720);
 
   useEffect(() => {
@@ -71,14 +84,24 @@ export default function TransitChart({ series, title, annotations = [], currentY
     return () => ro.disconnect();
   }, []);
 
-  const H = W < 480 ? 250 : 300;
-  const M = { top: 14, right: W < 480 ? 26 : 46, bottom: 30, left: 34 };
+  const H = W < 480 ? 260 : 310;
+  const M = { top: 18, right: W < 480 ? 26 : 46, bottom: 34, left: 34 };
 
   const years = useMemo(() => {
     const ys = new Set<number>();
     series.forEach((s) => s.points.forEach((p) => ys.add(p.year)));
     return [...ys].sort((a, b) => a - b);
   }, [series]);
+
+  const transitions = useMemo(() => {
+    if (!birthDate || !years.length) return [];
+    return transitionPoints(
+      birthDate,
+      series.map((s) => s.aspect as AspectId),
+      years[0],
+      years[years.length - 1]
+    );
+  }, [birthDate, series, years]);
 
   if (!series.length || !years.length) return null;
 
@@ -109,10 +132,25 @@ export default function TransitChart({ series, title, annotations = [], currentY
     tickYears.splice(tickYears.length - 2, 1);
   }
 
-  function onMove(e: React.PointerEvent<SVGSVGElement>) {
-    const svg = svgRef.current;
+  const seriesMarkers = transitions.filter(
+    (t) => t.aspect !== null && series.some((s) => s.aspect === t.aspect)
+  );
+  const thresholds = transitions.filter((t) => t.aspect === null);
+
+  function placeTip(clientX: number, clientY: number) {
     const wrap = wrapRef.current;
-    if (!svg || !wrap) return;
+    if (!wrap) return;
+    const wrapRect = wrap.getBoundingClientRect();
+    setTipPos({
+      x: Math.min(wrapRect.width - 230, Math.max(4, clientX - wrapRect.left + 14)),
+      y: Math.max(0, clientY - wrapRect.top - 12),
+    });
+  }
+
+  function onMove(e: React.PointerEvent<SVGSVGElement>) {
+    if (marker) return; // marker tooltip takes precedence
+    const svg = svgRef.current;
+    if (!svg) return;
     const rect = svg.getBoundingClientRect();
     const vx = ((e.clientX - rect.left) / rect.width) * W;
     if (vx < M.left - 8 || vx > W - M.right + 8) {
@@ -122,11 +160,7 @@ export default function TransitChart({ series, title, annotations = [], currentY
     const t = (vx - M.left) / (W - M.left - M.right);
     const year = Math.round(x0 + t * (x1 - x0));
     setHoverYear(Math.min(x1, Math.max(x0, year)));
-    const wrapRect = wrap.getBoundingClientRect();
-    setTipPos({
-      x: Math.min(wrapRect.width - 150, Math.max(4, e.clientX - wrapRect.left + 14)),
-      y: Math.max(0, e.clientY - wrapRect.top - 10),
-    });
+    placeTip(e.clientX, e.clientY);
   }
 
   const hovered =
@@ -137,6 +171,44 @@ export default function TransitChart({ series, title, annotations = [], currentY
           slot: s.slot,
           value: s.points.find((p) => p.year === hoverYear)?.value,
         }));
+
+  // drivers behind the hovered year (personal-year + animal-year labels are aspect-independent)
+  const hoverDrivers =
+    hoverYear != null && birthDate
+      ? aspectScoreDetail(birthDate, series[0].aspect as AspectId, hoverYear)
+      : null;
+
+  const markerShape = (t: TransitionPoint) => {
+    const cx = xOf(t.year);
+    const cy = yOf(t.value ?? 0);
+    const c = color(t.slot ?? 5);
+    switch (t.kind) {
+      case "peak":
+        return <circle cx={cx} cy={cy} r={5.5} fill={c} stroke="var(--surface)" strokeWidth={2} />;
+      case "trough":
+        return <circle cx={cx} cy={cy} r={5} fill="var(--surface)" stroke={c} strokeWidth={2} />;
+      case "surge":
+        return (
+          <path
+            d={`M${cx},${cy - 6.5} L${cx + 6},${cy + 4.5} L${cx - 6},${cy + 4.5} Z`}
+            fill={c}
+            stroke="var(--surface)"
+            strokeWidth={2}
+          />
+        );
+      case "drop":
+        return (
+          <path
+            d={`M${cx},${cy + 6.5} L${cx + 6},${cy - 4.5} L${cx - 6},${cy - 4.5} Z`}
+            fill="var(--surface)"
+            stroke={c}
+            strokeWidth={2}
+          />
+        );
+      default:
+        return null;
+    }
+  };
 
   return (
     <div className="viz-root" ref={wrapRef}>
@@ -158,8 +230,23 @@ export default function TransitChart({ series, title, annotations = [], currentY
         role="img"
         aria-label={title || "Life transit chart"}
         onPointerMove={onMove}
-        onPointerLeave={() => setHoverYear(null)}
+        onPointerLeave={() => {
+          setHoverYear(null);
+          setMarker(null);
+        }}
       >
+        {/* threshold-year bands (own-sign / clash years) */}
+        {thresholds.map((t) => (
+          <rect
+            key={`band-${t.year}`}
+            x={xOf(t.year) - Math.min(14, (xOf(x0 + 1) - xOf(x0)) / 2 || 14)}
+            width={Math.min(28, xOf(x0 + 1) - xOf(x0) || 28)}
+            y={M.top}
+            height={yOf(0) - M.top}
+            fill="var(--accent)"
+            opacity={0.05}
+          />
+        ))}
         {/* gridlines */}
         {[0, 25, 50, 75, 100].map((v) => (
           <g key={v}>
@@ -183,7 +270,6 @@ export default function TransitChart({ series, title, annotations = [], currentY
             </text>
           </g>
         ))}
-        {/* baseline */}
         <line
           x1={M.left}
           x2={W - M.right}
@@ -192,12 +278,11 @@ export default function TransitChart({ series, title, annotations = [], currentY
           stroke="var(--baseline)"
           strokeWidth={1}
         />
-        {/* x ticks */}
         {tickYears.map((y) => (
           <text
             key={y}
             x={xOf(y)}
-            y={H - 10}
+            y={H - 12}
             textAnchor="middle"
             fontSize={11}
             fill="var(--ink-muted)"
@@ -208,18 +293,27 @@ export default function TransitChart({ series, title, annotations = [], currentY
         ))}
         {/* current-year marker */}
         {currentYear != null && currentYear >= x0 && currentYear <= x1 && (
-          <line
-            x1={xOf(currentYear)}
-            x2={xOf(currentYear)}
-            y1={M.top}
-            y2={yOf(0)}
-            stroke="var(--baseline)"
-            strokeWidth={1}
-            strokeDasharray="none"
-            opacity={0.9}
-          />
+          <g>
+            <line
+              x1={xOf(currentYear)}
+              x2={xOf(currentYear)}
+              y1={M.top}
+              y2={yOf(0)}
+              stroke="var(--baseline)"
+              strokeWidth={1}
+            />
+            <text
+              x={xOf(currentYear)}
+              y={M.top - 6}
+              textAnchor="middle"
+              fontSize={10.5}
+              fill="var(--ink-muted)"
+            >
+              now
+            </text>
+          </g>
         )}
-        {/* annotations */}
+        {/* free annotations from chart directives */}
         {annotations
           .filter((a) => a.year >= x0 && a.year <= x1)
           .map((a) => (
@@ -244,9 +338,7 @@ export default function TransitChart({ series, title, annotations = [], currentY
               </text>
             </g>
           ))}
-        {/* area wash for single series */}
         {single && <path d={areaOf(series[0])} fill={color(series[0].slot)} opacity={0.1} />}
-        {/* series lines */}
         {series.map((s) => (
           <path
             key={s.aspect}
@@ -258,23 +350,8 @@ export default function TransitChart({ series, title, annotations = [], currentY
             strokeLinecap="round"
           />
         ))}
-        {/* end markers with surface ring */}
-        {series.map((s) => {
-          const last = s.points[s.points.length - 1];
-          return (
-            <circle
-              key={s.aspect}
-              cx={xOf(last.year)}
-              cy={yOf(last.value)}
-              r={4}
-              fill={color(s.slot)}
-              stroke="var(--surface)"
-              strokeWidth={2}
-            />
-          );
-        })}
-        {/* hover crosshair + markers */}
-        {hoverYear != null && (
+        {/* hover crosshair */}
+        {hoverYear != null && !marker && (
           <g>
             <line
               x1={xOf(hoverYear)}
@@ -302,8 +379,74 @@ export default function TransitChart({ series, title, annotations = [], currentY
             })}
           </g>
         )}
+        {/* threshold-year diamonds on the baseline */}
+        {thresholds.map((t) => {
+          const cx = xOf(t.year);
+          const cy = yOf(0);
+          const active = marker === t;
+          return (
+            <g
+              key={`th-${t.year}`}
+              onPointerEnter={(e) => {
+                setMarker(t);
+                placeTip(e.clientX, e.clientY);
+              }}
+              onPointerLeave={() => setMarker(null)}
+              style={{ cursor: "help" }}
+            >
+              <circle cx={cx} cy={cy} r={13} fill="transparent" />
+              <path
+                d={`M${cx},${cy - 6} L${cx + 6},${cy} L${cx},${cy + 6} L${cx - 6},${cy} Z`}
+                fill="var(--accent)"
+                stroke="var(--surface)"
+                strokeWidth={2}
+                opacity={active ? 1 : 0.9}
+              />
+            </g>
+          );
+        })}
+        {/* per-aspect transition markers */}
+        {seriesMarkers.map((t, i) => (
+          <g
+            key={`${t.aspect}-${t.kind}-${t.year}-${i}`}
+            onPointerEnter={(e) => {
+              setMarker(t);
+              placeTip(e.clientX, e.clientY);
+            }}
+            onPointerLeave={() => setMarker(null)}
+            style={{ cursor: "help" }}
+          >
+            <circle cx={xOf(t.year)} cy={yOf(t.value ?? 0)} r={13} fill="transparent" />
+            {markerShape(t)}
+          </g>
+        ))}
       </svg>
-      {hoverYear != null && hovered && (
+
+      {/* marker legend */}
+      {transitions.length > 0 && (
+        <div className="viz-markerkey">
+          <span><i className="mk mk-peak" /> supportive window</span>
+          <span><i className="mk mk-trough" /> consolidation</span>
+          <span><i className="mk mk-threshold" /> threshold year</span>
+          <span className="hint">hover a marker for guidance</span>
+        </div>
+      )}
+
+      {/* marker elaboration tooltip */}
+      {marker && (
+        <div className="viz-tooltip viz-tooltip-marker" style={{ left: tipPos.x, top: tipPos.y }}>
+          <div className="t-kicker">
+            {marker.year}
+            {marker.value != null ? ` · ${marker.value}/100` : ""}
+          </div>
+          <div className="t-title">{marker.title}</div>
+          <div className="t-why">Why: {marker.why}.</div>
+          <div className="t-advice">{marker.advice}</div>
+        </div>
+      )}
+
+      {/* crosshair tooltip */}
+      {hoverYear != null && !marker && hovered && (
         <div className="viz-tooltip" style={{ left: tipPos.x, top: tipPos.y }}>
           <div className="t-year">
             {hoverYear}
@@ -318,6 +461,11 @@ export default function TransitChart({ series, title, annotations = [], currentY
                   <span className="val">{h.value}</span>
                 </div>
               )
+          )}
+          {hoverDrivers && (
+            <div className="t-drivers">
+              {hoverDrivers.personalYear.label} · {hoverDrivers.branch.label}
+            </div>
           )}
         </div>
       )}
