@@ -95,7 +95,7 @@ export function aspectScoreDetail(birthDate: string, aspect: AspectId, year: num
   const pyPts = a * 0.42 * 45;
   const brPts = r * 0.33 * 45;
   const ryPts = (s * 0.18 + p * 0.07) * 45;
-  const score = Math.round(Math.min(96, Math.max(6, 50 + pyPts + brPts + ryPts)) * 10) / 10;
+  const score = Math.round(Math.min(96, Math.max(6, 50 + pyPts + brPts + ryPts)));
 
   const pillar = yearPillar(year);
   const pyTheme = PERSONAL_YEAR_THEMES[py].split(" — ")[0];
@@ -119,16 +119,16 @@ export function aspectScoreDetail(birthDate: string, aspect: AspectId, year: num
     value: score,
     personalYear: {
       number: py,
-      points: Math.round(pyPts * 10) / 10,
+      points: Math.round(pyPts),
       label: `Personal year ${py} — ${pyTheme}`,
     },
     branch: {
       relation: rel,
-      points: Math.round(brPts * 10) / 10,
+      points: Math.round(brPts),
       label: `${pillar.animal} year — ${rel === "neutral" ? "neutral to your sign" : RELATION_NOTES[rel].split(" — ")[0]}`,
     },
     rhythm: {
-      points: Math.round(ryPts * 10) / 10,
+      points: Math.round(ryPts),
       label: `Seven-year rhythm ${ryPts >= 0 ? "rising" : "resting"}`,
     },
     dominant: drivers[0].line,

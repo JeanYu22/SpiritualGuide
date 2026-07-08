@@ -23,16 +23,15 @@ function inline(text: string): React.ReactNode[] {
   return out;
 }
 
-function renderText(text: string): React.ReactNode[] {
+function renderBlocks(lines: string[], keyBase: string): React.ReactNode[] {
   const blocks: React.ReactNode[] = [];
-  const lines = text.split("\n");
   let list: string[] = [];
   let key = 0;
 
   const flushList = () => {
     if (list.length) {
       blocks.push(
-        <ul key={key++}>
+        <ul key={`${keyBase}-${key++}`}>
           {list.map((li, i) => (
             <li key={i}>{inline(li)}</li>
           ))}
@@ -45,24 +44,22 @@ function renderText(text: string): React.ReactNode[] {
   let para: string[] = [];
   const flushPara = () => {
     if (para.length) {
-      blocks.push(<p key={key++}>{inline(para.join(" "))}</p>);
+      blocks.push(<p key={`${keyBase}-${key++}`}>{inline(para.join(" "))}</p>);
       para = [];
     }
   };
 
   for (const raw of lines) {
     const line = raw.trimEnd();
-    if (/^#{1,4}\s+/.test(line)) {
-      flushList();
-      flushPara();
-      blocks.push(<h3 key={key++}>{inline(line.replace(/^#{1,4}\s+/, ""))}</h3>);
-    } else if (/^[-*]\s+/.test(line)) {
+    if (/^[-*]\s+/.test(line)) {
       flushPara();
       list.push(line.replace(/^[-*]\s+/, ""));
     } else if (/^>\s?/.test(line)) {
       flushList();
       flushPara();
-      blocks.push(<blockquote key={key++}>{inline(line.replace(/^>\s?/, ""))}</blockquote>);
+      blocks.push(
+        <blockquote key={`${keyBase}-${key++}`}>{inline(line.replace(/^>\s?/, ""))}</blockquote>
+      );
     } else if (line.trim() === "") {
       flushList();
       flushPara();
@@ -74,6 +71,52 @@ function renderText(text: string): React.ReactNode[] {
   flushList();
   flushPara();
   return blocks;
+}
+
+// the four counsel factors (plus next steps) render as distinct advisory cards
+const FACTOR_META: [RegExp, { kind: string; icon: string }][] = [
+  [/^opportunit/i, { kind: "opp", icon: "☀" }],
+  [/^obstacle/i, { kind: "obs", icon: "⛰" }],
+  [/^supporting|^resources|^allies/i, { kind: "res", icon: "◈" }],
+  [/^watch/i, { kind: "watch", icon: "⚠" }],
+  [/^next step/i, { kind: "next", icon: "➤" }],
+];
+
+function renderText(text: string): React.ReactNode[] {
+  // split into sections at markdown headings so factor sections can be styled as cards
+  const lines = text.split("\n");
+  const sections: { title: string | null; lines: string[] }[] = [{ title: null, lines: [] }];
+  for (const raw of lines) {
+    const m = raw.match(/^#{1,4}\s+(.*)/);
+    if (m) sections.push({ title: m[1].trim(), lines: [] });
+    else sections[sections.length - 1].lines.push(raw);
+  }
+
+  const out: React.ReactNode[] = [];
+  sections.forEach((sec, i) => {
+    const body = renderBlocks(sec.lines, `s${i}`);
+    if (sec.title == null) {
+      out.push(...body);
+      return;
+    }
+    const meta = FACTOR_META.find(([re]) => re.test(sec.title!))?.[1];
+    if (meta) {
+      out.push(
+        <section className={`factor factor-${meta.kind}`} key={`sec${i}`}>
+          <div className="factor-head">
+            <span className="f-icon" aria-hidden>
+              {meta.icon}
+            </span>
+            {inline(sec.title)}
+          </div>
+          <div className="factor-body">{body}</div>
+        </section>
+      );
+    } else {
+      out.push(<h3 key={`h${i}`}>{inline(sec.title)}</h3>, ...body);
+    }
+  });
+  return out;
 }
 
 /* ---------- chart-directive parsing ---------- */

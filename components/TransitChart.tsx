@@ -8,6 +8,14 @@ import {
   TransitionPoint,
 } from "@/lib/divination/cycles";
 
+const KIND_SHORT: Record<string, string> = {
+  peak: "peak",
+  trough: "consolidation",
+  surge: "momentum up",
+  drop: "tide turns",
+  threshold: "threshold",
+};
+
 interface Props {
   series: TransitSeries[];
   title?: string;
@@ -132,10 +140,17 @@ export default function TransitChart({
     tickYears.splice(tickYears.length - 2, 1);
   }
 
+  // with many curves visible, mark only the strongest signals (peaks + thresholds)
+  // so the critical transitions stay readable; focused views get every marker
+  const crowded = series.length > 2;
   const seriesMarkers = transitions.filter(
-    (t) => t.aspect !== null && series.some((s) => s.aspect === t.aspect)
+    (t) =>
+      t.aspect !== null &&
+      series.some((s) => s.aspect === t.aspect) &&
+      (!crowded || t.kind === "peak")
   );
   const thresholds = transitions.filter((t) => t.aspect === null);
+  const stripPoints = [...seriesMarkers, ...thresholds].sort((a, b) => a.year - b.year);
 
   function placeTip(clientX: number, clientY: number) {
     const wrap = wrapRef.current;
@@ -422,13 +437,52 @@ export default function TransitChart({
         ))}
       </svg>
 
+      {/* critical transitions strip — every marked point, hoverable for guidance */}
+      {stripPoints.length > 0 && (
+        <div className="viz-transitions">
+          <div className="viz-transitions-head">
+            Critical transitions
+            <span className="hint">hover for what each asks of you</span>
+          </div>
+          <div className="viz-transitions-row">
+            {stripPoints.map((t, i) => (
+              <button
+                key={`strip-${t.year}-${t.kind}-${t.aspect ?? "all"}-${i}`}
+                type="button"
+                className={`tp-pill tp-${t.kind}`}
+                onPointerEnter={(e) => {
+                  setMarker(t);
+                  placeTip(e.clientX, e.clientY);
+                }}
+                onPointerLeave={() => setMarker(null)}
+                onClick={(e) => {
+                  setMarker(marker === t ? null : t);
+                  placeTip(e.clientX, e.clientY);
+                }}
+              >
+                {t.aspect !== null && (
+                  <span className="dot" style={{ background: color(t.slot ?? 5) }} />
+                )}
+                {t.aspect === null && <span className="th-glyph">◆</span>}
+                <b>{t.year}</b>
+                <span className="lbl">
+                  {t.aspect === null
+                    ? t.title.replace(/\s*\(.*\)/, "").toLowerCase()
+                    : `${t.aspectName} ${KIND_SHORT[t.kind]}`}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* marker legend */}
       {transitions.length > 0 && (
         <div className="viz-markerkey">
           <span><i className="mk mk-peak" /> supportive window</span>
-          <span><i className="mk mk-trough" /> consolidation</span>
+          {!crowded && <span><i className="mk mk-trough" /> consolidation</span>}
           <span><i className="mk mk-threshold" /> threshold year</span>
-          <span className="hint">hover a marker for guidance</span>
+          {crowded && <span className="hint">focus 1–2 aspects to see every turn</span>}
         </div>
       )}
 
@@ -462,7 +516,24 @@ export default function TransitChart({
                 </div>
               )
           )}
-          {hoverDrivers && (
+          {hoverDrivers && single && (
+            <div className="t-drivers">
+              <div className="t-drivers-head">Why this level:</div>
+              {[hoverDrivers.personalYear, hoverDrivers.branch, hoverDrivers.rhythm]
+                .slice()
+                .sort((a, b) => Math.abs(b.points) - Math.abs(a.points))
+                .map((d) => (
+                  <div className="t-driver-row" key={d.label}>
+                    <span>{d.label}</span>
+                    <span className={`pts ${d.points >= 0 ? "up" : "down"}`}>
+                      {d.points >= 0 ? "+" : ""}
+                      {d.points}
+                    </span>
+                  </div>
+                ))}
+            </div>
+          )}
+          {hoverDrivers && !single && (
             <div className="t-drivers">
               {hoverDrivers.personalYear.label} · {hoverDrivers.branch.label}
             </div>

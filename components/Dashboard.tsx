@@ -60,19 +60,23 @@ export default function Dashboard({ profile }: { profile: Profile }) {
         </div>
       </div>
 
-      <div className="chips" style={{ marginBottom: 14 }}>
-        {ASPECTS.map((a) => (
-          <button
-            key={a.id}
-            type="button"
-            className="chip"
-            data-on={active.includes(a.id)}
-            onClick={() => toggle(a.id)}
-          >
-            <span className="dot" style={{ background: `var(--series-${a.slot})` }} />
-            {a.name}
-          </button>
-        ))}
+      <div className="chips-row">
+        <span className="chips-label">Focus the map</span>
+        <div className="chips">
+          {ASPECTS.map((a) => (
+            <button
+              key={a.id}
+              type="button"
+              className="chip"
+              data-on={active.includes(a.id)}
+              onClick={() => toggle(a.id)}
+              title={`Toggle ${a.name}`}
+            >
+              <span className="dot" style={{ background: `var(--series-${a.slot})` }} />
+              {a.name}
+            </button>
+          ))}
+        </div>
       </div>
 
       <TransitChart
@@ -82,7 +86,7 @@ export default function Dashboard({ profile }: { profile: Profile }) {
         birthDate={profile.birthDate}
       />
 
-      <details className="explainer">
+      <details className="explainer" open>
         <summary>What moves these curves?</summary>
         <div className="body">
           Each year&apos;s score blends three deterministic cycles computed from your birth date —

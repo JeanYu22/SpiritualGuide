@@ -216,7 +216,7 @@ button {
 
 .grid-main {
   display: grid;
-  grid-template-columns: minmax(0, 5fr) minmax(0, 4fr);
+  grid-template-columns: minmax(0, 24fr) minmax(0, 25fr);
   gap: 22px;
   align-items: start;
 }
@@ -260,47 +260,84 @@ button {
 
 /* ---------- hero / landing ---------- */
 .hero {
+  position: relative;
   text-align: center;
-  padding: 56px 16px 36px;
+  padding: 64px 24px 56px;
+  margin-top: 10px;
+  border-radius: 24px;
+  overflow: hidden;
+  background:
+    radial-gradient(1000px 480px at 50% -22%, rgba(122, 92, 200, 0.5), transparent 62%),
+    radial-gradient(700px 400px at 88% 108%, rgba(185, 138, 75, 0.24), transparent 60%),
+    linear-gradient(168deg, #191434 0%, #221a4a 46%, #16112c 100%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 24px 60px -30px rgba(25, 20, 52, 0.55);
+}
+
+/* star field */
+.hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(1.4px 1.4px at 12% 28%, rgba(255, 255, 255, 0.9), transparent 55%),
+    radial-gradient(1px 1px at 26% 64%, rgba(255, 255, 255, 0.55), transparent 55%),
+    radial-gradient(1.6px 1.6px at 38% 18%, rgba(255, 255, 255, 0.8), transparent 55%),
+    radial-gradient(1px 1px at 52% 42%, rgba(255, 255, 255, 0.5), transparent 55%),
+    radial-gradient(1.4px 1.4px at 64% 12%, rgba(255, 255, 255, 0.85), transparent 55%),
+    radial-gradient(1px 1px at 73% 56%, rgba(255, 255, 255, 0.5), transparent 55%),
+    radial-gradient(1.7px 1.7px at 86% 30%, rgba(255, 255, 255, 0.9), transparent 55%),
+    radial-gradient(1px 1px at 92% 74%, rgba(255, 255, 255, 0.45), transparent 55%),
+    radial-gradient(1.2px 1.2px at 8% 82%, rgba(255, 255, 255, 0.6), transparent 55%),
+    radial-gradient(1.2px 1.2px at 45% 88%, rgba(255, 255, 255, 0.5), transparent 55%);
+  pointer-events: none;
 }
 
 .hero .symbols {
-  font-size: 20px;
+  position: relative;
+  font-size: 19px;
   letter-spacing: 22px;
   padding-left: 22px; /* balance the trailing letter-spacing */
-  color: var(--accent);
-  margin-bottom: 20px;
-  opacity: 0.9;
+  color: #cfc4f5;
+  margin-bottom: 22px;
+  opacity: 0.95;
+  text-shadow: 0 0 18px rgba(177, 167, 242, 0.55);
 }
 
 .hero h2 {
-  font-size: clamp(32px, 5.2vw, 52px);
+  position: relative;
+  font-size: clamp(32px, 5.2vw, 54px);
   line-height: 1.12;
-  margin: 0 auto 16px;
-  max-width: 17ch;
+  margin: 0 auto 18px;
+  max-width: 18ch;
+  color: #f6f3ec;
 }
 
 .hero h2 em {
   font-style: italic;
-  background: var(--accent-line);
+  background: linear-gradient(90deg, #c9b8ff, #e8c98f);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
 }
 
 .hero p {
-  color: var(--ink-2);
+  position: relative;
+  color: rgba(240, 236, 228, 0.82);
   max-width: 620px;
   margin: 0 auto;
   font-size: 16.5px;
 }
 
 .lenses {
+  position: relative;
+  z-index: 1;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 14px;
   max-width: 880px;
-  margin: 34px auto 30px;
+  margin: -26px auto 30px;
+  padding: 0 14px;
 }
 
 @media (max-width: 720px) {
@@ -424,6 +461,23 @@ button {
 }
 
 /* ---------- chips ---------- */
+.chips-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.chips-label {
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  font-weight: 600;
+  flex: none;
+}
+
 .chips {
   display: flex;
   flex-wrap: wrap;
@@ -644,6 +698,86 @@ button {
   height: 8px;
 }
 
+/* ---------- critical transitions strip ---------- */
+.viz-transitions {
+  margin-top: 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-2);
+  padding: 10px 12px;
+}
+
+.viz-transitions-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.viz-transitions-head .hint {
+  letter-spacing: 0;
+  text-transform: none;
+  font-weight: 400;
+  font-style: italic;
+  color: var(--ink-muted);
+}
+
+.viz-transitions-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tp-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink-2);
+  font-size: 12px;
+  padding: 4px 11px;
+  cursor: help;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.tp-pill:hover {
+  border-color: var(--accent);
+  color: var(--ink);
+  box-shadow: var(--shadow-card);
+  transform: translateY(-1px);
+}
+
+.tp-pill b {
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.tp-pill .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+}
+
+.tp-pill .th-glyph {
+  color: var(--accent);
+  font-size: 10px;
+}
+
+.tp-threshold {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+  background: var(--accent-soft);
+}
+
 .viz-tooltip {
   position: absolute;
   pointer-events: none;
@@ -692,6 +826,52 @@ button {
   color: var(--ink-muted);
   font-size: 11.5px;
   line-height: 1.45;
+}
+
+.viz-tooltip .t-drivers-head {
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  margin-bottom: 3px;
+}
+
+.viz-tooltip .t-driver-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--ink-2);
+}
+
+.viz-tooltip .t-driver-row .pts {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.viz-tooltip .t-driver-row .pts.up {
+  color: #1a7f4e;
+}
+
+.viz-tooltip .t-driver-row .pts.down {
+  color: #b3374a;
+}
+
+[data-theme="dark"] .viz-tooltip .t-driver-row .pts.up {
+  color: #4cc994;
+}
+
+[data-theme="dark"] .viz-tooltip .t-driver-row .pts.down {
+  color: #e8788a;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .viz-tooltip .t-driver-row .pts.up {
+    color: #4cc994;
+  }
+  :root:not([data-theme="light"]) .viz-tooltip .t-driver-row .pts.down {
+    color: #e8788a;
+  }
 }
 
 .viz-tooltip-marker .t-kicker {
@@ -808,8 +988,8 @@ button {
 .chat-scroll {
   flex: 1;
   overflow-y: auto;
-  max-height: 64vh;
-  padding-right: 4px;
+  max-height: 72vh;
+  padding-right: 6px;
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -891,6 +1071,106 @@ button {
   color: var(--ink-2);
   font-size: 13px;
   font-style: italic;
+}
+
+/* ---------- advisory factor cards ---------- */
+.factor {
+  margin: 12px 0;
+  border-radius: 12px;
+  border: 1px solid var(--f-border, var(--border));
+  border-left: 4px solid var(--f-edge, var(--accent));
+  background: var(--f-bg, var(--surface));
+  padding: 11px 14px 8px;
+}
+
+.factor-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 15.5px;
+  color: var(--f-edge, var(--ink));
+  margin-bottom: 2px;
+}
+
+.factor-head .f-icon {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.factor-body p,
+.factor-body ul {
+  margin: 6px 0;
+}
+
+.factor-body li {
+  margin-bottom: 5px;
+}
+
+.factor-body li::marker {
+  color: var(--f-edge, var(--accent));
+}
+
+.factor-opp {
+  --f-edge: #1a7f4e;
+  --f-bg: rgba(27, 175, 122, 0.06);
+  --f-border: rgba(27, 175, 122, 0.25);
+}
+
+.factor-obs {
+  --f-edge: #a8630a;
+  --f-bg: rgba(237, 161, 0, 0.07);
+  --f-border: rgba(237, 161, 0, 0.28);
+}
+
+.factor-res {
+  --f-edge: #1f63b5;
+  --f-bg: rgba(42, 120, 214, 0.06);
+  --f-border: rgba(42, 120, 214, 0.25);
+}
+
+.factor-watch {
+  --f-edge: #b3374a;
+  --f-bg: rgba(227, 73, 72, 0.06);
+  --f-border: rgba(227, 73, 72, 0.24);
+}
+
+.factor-next {
+  --f-edge: var(--accent);
+  --f-bg: var(--accent-soft);
+  --f-border: var(--border);
+}
+
+[data-theme="dark"] .factor-opp {
+  --f-edge: #4cc994;
+}
+
+[data-theme="dark"] .factor-obs {
+  --f-edge: #e6a94e;
+}
+
+[data-theme="dark"] .factor-res {
+  --f-edge: #6ba6ec;
+}
+
+[data-theme="dark"] .factor-watch {
+  --f-edge: #e8788a;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .factor-opp {
+    --f-edge: #4cc994;
+  }
+  :root:not([data-theme="light"]) .factor-obs {
+    --f-edge: #e6a94e;
+  }
+  :root:not([data-theme="light"]) .factor-res {
+    --f-edge: #6ba6ec;
+  }
+  :root:not([data-theme="light"]) .factor-watch {
+    --f-edge: #e8788a;
+  }
 }
 
 .msg .chart-embed {
