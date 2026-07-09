@@ -1,8 +1,11 @@
 "use client";
 
 import { Cast } from "@/lib/divination/iching";
+import { useLang, useT } from "@/lib/i18n";
 
 export default function Hexagram({ cast }: { cast: Cast }) {
+  const lang = useLang();
+  const t = useT();
   return (
     <div className="hexagram">
       <div className="hex-lines" aria-hidden>
@@ -19,13 +22,17 @@ export default function Hexagram({ cast }: { cast: Cast }) {
                   <span className="bar half" />
                 </>
               )}
-              {changing && <span className="changing" title="changing line" />}
+              {changing && <span className="changing" title={t.changingLine} />}
             </div>
           );
         })}
       </div>
       <div className="hex-meta">
-        <div className="num">Hexagram {cast.primary.number}</div>
+        <div className="num">
+          {lang === "zh"
+            ? `第 ${cast.primary.number} 卦`
+            : `${t.hexagram} ${cast.primary.number}`}
+        </div>
         <div className="name">
           {cast.primary.chinese} {cast.primary.pinyin} — {cast.primary.english}
         </div>
@@ -34,7 +41,7 @@ export default function Hexagram({ cast }: { cast: Cast }) {
           {cast.resulting && (
             <>
               <br />
-              changing toward #{cast.resulting.number} {cast.resulting.english}
+              {t.changingToward} #{cast.resulting.number} {cast.resulting.english}
             </>
           )}
         </div>

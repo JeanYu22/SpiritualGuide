@@ -2,30 +2,22 @@
 
 import { useEffect, useState } from "react";
 import { Profile } from "@/lib/types";
+import { Lang, LangContext, useT } from "@/lib/i18n";
 import ProfileForm from "@/components/ProfileForm";
 import Dashboard from "@/components/Dashboard";
 import ChatPanel from "@/components/ChatPanel";
 
-export default function Home() {
+function HomeInner({
+  lang,
+  toggleLang,
+  toggleTheme,
+}: {
+  lang: Lang;
+  toggleLang: () => void;
+  toggleTheme: () => void;
+}) {
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [theme, setTheme] = useState<"light" | "dark" | null>(null);
-
-  useEffect(() => {
-    const saved = window.localStorage.getItem("sg-theme");
-    if (saved === "light" || saved === "dark") {
-      setTheme(saved);
-      document.documentElement.dataset.theme = saved;
-    }
-  }, []);
-
-  function toggleTheme() {
-    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    const current = theme ?? (prefersDark ? "dark" : "light");
-    const next = current === "dark" ? "light" : "dark";
-    setTheme(next);
-    document.documentElement.dataset.theme = next;
-    window.localStorage.setItem("sg-theme", next);
-  }
+  const t = useT();
 
   return (
     <div className="shell">
@@ -36,16 +28,24 @@ export default function Home() {
           </span>
           <div>
             <h1>SpiritualGuide</h1>
-            <span className="tagline">life-transit oracle</span>
+            <span className="tagline">{t.tagline}</span>
           </div>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
           {profile && (
             <button className="btn-ghost" onClick={() => setProfile(null)}>
-              New seeker
+              {t.newSeeker}
             </button>
           )}
-          <button className="theme-toggle" onClick={toggleTheme} aria-label="Toggle theme">
+          <button
+            className="btn-ghost lang-toggle"
+            onClick={toggleLang}
+            aria-label="Switch language"
+            title={lang === "en" ? "切換至繁體中文" : "Switch to English"}
+          >
+            {lang === "en" ? "繁中" : "EN"}
+          </button>
+          <button className="theme-toggle" onClick={toggleTheme} aria-label={t.themeLabel}>
             ☾ · ☀
           </button>
         </div>
@@ -58,13 +58,11 @@ export default function Home() {
               ☰ ☱ ☲ ☳ ☴ ☵ ☶ ☷
             </div>
             <h2>
-              See the <em>seasons of your life</em> before you plan them
+              {t.heroLead}
+              <em>{t.heroEm}</em>
+              {t.heroTail}
             </h2>
-            <p>
-              An oracle that reads your question through ancient traditions, then maps the same
-              cycles as clear, systematic curves — so you can prepare for the threshold years and
-              act in the supportive ones.
-            </p>
+            <p>{t.heroBody}</p>
           </section>
 
           <div className="lenses">
@@ -72,44 +70,31 @@ export default function Home() {
               <div className="glyph" aria-hidden>
                 ☯
               </div>
-              <h3>The symbolic lens</h3>
-              <p>
-                I-Ching hexagrams, Chinese year pillars, Vedic rhythm and numerology — the oracle
-                chooses the tradition that fits your question, and tells you why.
-              </p>
+              <h3>{t.lensSymbolTitle}</h3>
+              <p>{t.lensSymbolBody}</p>
             </div>
             <div className="lens">
               <div className="glyph" aria-hidden>
                 ◈
               </div>
-              <h3>The systematic lens</h3>
-              <p>
-                Your nine-, twelve- and seven-year cycles rendered as transit curves, with every
-                critical transition point marked and explained.
-              </p>
+              <h3>{t.lensSystemTitle}</h3>
+              <p>{t.lensSystemBody}</p>
             </div>
             <div className="lens">
               <div className="glyph" aria-hidden>
                 ✦
               </div>
-              <h3>The counsel</h3>
-              <p>
-                Every reading closes with opportunities, obstacles, supporting resources and
-                watch-outs — and concrete next steps you can plan around.
-              </p>
+              <h3>{t.lensCounselTitle}</h3>
+              <p>{t.lensCounselBody}</p>
             </div>
           </div>
 
           <div className="card begin-card">
-            <h2>Begin</h2>
-            <p className="sub">
-              Your birth data stays in your browser and is used only to compute your reading.
-            </p>
+            <h2>{t.begin}</h2>
+            <p className="sub">{t.beginSub}</p>
             <ProfileForm onSubmit={setProfile} />
           </div>
-          <p className="disclaimer">
-            SpiritualGuide offers reflective guidance, not predictions or professional advice.
-          </p>
+          <p className="disclaimer">{t.disclaimer}</p>
         </>
       ) : (
         <>
@@ -117,11 +102,53 @@ export default function Home() {
             <Dashboard profile={profile} />
             <ChatPanel profile={profile} />
           </main>
-          <p className="disclaimer">
-            SpiritualGuide offers reflective guidance, not predictions or professional advice.
-          </p>
+          <p className="disclaimer">{t.disclaimer}</p>
         </>
       )}
     </div>
+  );
+}
+
+export default function Home() {
+  const [theme, setTheme] = useState<"light" | "dark" | null>(null);
+  const [lang, setLang] = useState<Lang>("en");
+
+  useEffect(() => {
+    const savedTheme = window.localStorage.getItem("sg-theme");
+    if (savedTheme === "light" || savedTheme === "dark") {
+      setTheme(savedTheme);
+      document.documentElement.dataset.theme = savedTheme;
+    }
+    const savedLang = window.localStorage.getItem("sg-lang");
+    if (savedLang === "en" || savedLang === "zh") {
+      setLang(savedLang);
+    } else if (typeof navigator !== "undefined" && /^zh/i.test(navigator.language)) {
+      setLang("zh");
+    }
+  }, []);
+
+  useEffect(() => {
+    document.documentElement.lang = lang === "zh" ? "zh-Hant" : "en";
+  }, [lang]);
+
+  function toggleTheme() {
+    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    const current = theme ?? (prefersDark ? "dark" : "light");
+    const next = current === "dark" ? "light" : "dark";
+    setTheme(next);
+    document.documentElement.dataset.theme = next;
+    window.localStorage.setItem("sg-theme", next);
+  }
+
+  function toggleLang() {
+    const next: Lang = lang === "en" ? "zh" : "en";
+    setLang(next);
+    window.localStorage.setItem("sg-lang", next);
+  }
+
+  return (
+    <LangContext.Provider value={lang}>
+      <HomeInner lang={lang} toggleLang={toggleLang} toggleTheme={toggleTheme} />
+    </LangContext.Provider>
   );
 }

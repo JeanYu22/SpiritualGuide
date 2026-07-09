@@ -52,16 +52,24 @@ Rules for chart directives: valid JSON only inside the fence; "aspects" is optio
 Formatting: use short markdown sections (###), occasional bold for key years/numbers, and keep responses focused — a reading, an interpretation, a practical suggestion. You may use the seeker's name.`;
 
 export async function POST(req: NextRequest) {
-  let body: { profile: Profile; messages: ChatMessage[] };
+  let body: { profile: Profile; messages: ChatMessage[]; lang?: "en" | "zh" };
   try {
     body = await req.json();
   } catch {
     return new Response("Invalid request", { status: 400 });
   }
-  const { profile, messages } = body;
+  const { profile, messages, lang } = body;
   if (!profile?.birthDate || !Array.isArray(messages) || messages.length === 0) {
     return new Response("Missing profile or messages", { status: 400 });
   }
+
+  // language directive: the live oracle answers in the seeker's chosen language.
+  // In Traditional Chinese it must use the exact section headings the UI styles
+  // as advisory cards.
+  const langInstruction =
+    lang === "zh"
+      ? `Respond entirely in Traditional Chinese (繁體中文, 台灣用語), warm and literary yet clear. Keep proper names, years and the chart directive JSON exactly as given. Close every substantive reading with these EXACT markdown headings in this order: "### 機遇" (opportunities), "### 阻礙" (obstacles), "### 助力資源" (supporting resources), "### 需留意" (watch-outs / drawbacks), then "### 下一步" (next steps).`
+      : `Respond in English.`;
 
   const lastUser = [...messages].reverse().find((m) => m.role === "user");
   const question = lastUser?.content ?? "";
@@ -130,7 +138,7 @@ export async function POST(req: NextRequest) {
             { type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } },
             {
               type: "text",
-              text: `Consultation context (computed by the app's deterministic engines; interpret, don't recompute):\n${summary}\nCurrent date: ${ctx.now.toISOString().slice(0, 10)}.`,
+              text: `${langInstruction}\n\nConsultation context (computed by the app's deterministic engines; interpret, don't recompute):\n${summary}\nCurrent date: ${ctx.now.toISOString().slice(0, 10)}.`,
             },
           ],
           messages: messages.map((m) => ({ role: m.role, content: m.content })),

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AspectId, ChartDirective, ChatMessage, Profile, ASPECTS } from "@/lib/types";
 import { transitSeries } from "@/lib/divination/cycles";
+import { useLang, useT } from "@/lib/i18n";
 import TransitChart from "./TransitChart";
 
 /* ---------- markdown-lite ---------- */
@@ -75,11 +76,11 @@ function renderBlocks(lines: string[], keyBase: string): React.ReactNode[] {
 
 // the four counsel factors (plus next steps) render as distinct advisory cards
 const FACTOR_META: [RegExp, { kind: string; icon: string }][] = [
-  [/^opportunit/i, { kind: "opp", icon: "☀" }],
-  [/^obstacle/i, { kind: "obs", icon: "⛰" }],
-  [/^supporting|^resources|^allies/i, { kind: "res", icon: "◈" }],
-  [/^watch|^drawback|^risk/i, { kind: "watch", icon: "⚠" }],
-  [/^next step/i, { kind: "next", icon: "➤" }],
+  [/^opportunit|機遇|機會/i, { kind: "opp", icon: "☀" }],
+  [/^obstacle|阻礙|障礙/i, { kind: "obs", icon: "⛰" }],
+  [/^supporting|^resources|^allies|助力|資源|援手/i, { kind: "res", icon: "◈" }],
+  [/^watch|^drawback|^risk|留意|注意|警示|需防/i, { kind: "watch", icon: "⚠" }],
+  [/^next step|下一步|後續步驟|接下來/i, { kind: "next", icon: "➤" }],
 ];
 
 function renderText(text: string): React.ReactNode[] {
@@ -170,14 +171,9 @@ function ChartEmbed({ directive, profile }: { directive: ChartDirective; profile
 
 /* ---------- chat panel ---------- */
 
-const SUGGESTIONS = [
-  "What should I focus on this year?",
-  "When is a supportive window for a career change?",
-  "How do the next three years look for relationships?",
-  "Which year ahead asks for the most care?",
-];
-
 export default function ChatPanel({ profile }: { profile: Profile }) {
+  const lang = useLang();
+  const t = useT();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
@@ -217,7 +213,7 @@ export default function ChatPanel({ profile }: { profile: Profile }) {
           const res = await fetch("/api/oracle", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ profile, messages: historyRef.current }),
+            body: JSON.stringify({ profile, messages: historyRef.current, lang }),
           });
           if (!res.ok || !res.body) throw new Error(`oracle returned ${res.status}`);
           const reader = res.body.getReader();
@@ -236,7 +232,7 @@ export default function ChatPanel({ profile }: { profile: Profile }) {
             ...historyRef.current,
             {
               role: "assistant",
-              content: "*The oracle's connection wavered — please try again in a moment.*",
+              content: t.wavered,
             },
           ];
         } finally {
@@ -263,21 +259,14 @@ export default function ChatPanel({ profile }: { profile: Profile }) {
   useEffect(() => {
     if (startedRef.current) return;
     startedRef.current = true;
-    send(
-      profile.focus
-        ? `Here is what is on my mind: ${profile.focus}. Please give me an opening reading.`
-        : "Please give me an opening reading of where I stand in my life cycles."
-    );
+    send(profile.focus ? t.openingWithFocus(profile.focus) : t.openingPlain);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
     <div className="card chat">
-      <h2>Consult the oracle</h2>
-      <p className="sub">
-        The interpretive lens — ask about any aspect, year or decision. The oracle chooses the
-        tradition that fits your question.
-      </p>
+      <h2>{t.consult}</h2>
+      <p className="sub">{t.consultSub}</p>
       <div className="chat-scroll" ref={scrollRef}>
         {messages.map((m, i) =>
           m.role === "user" ? (
@@ -286,9 +275,9 @@ export default function ChatPanel({ profile }: { profile: Profile }) {
             </div>
           ) : (
             <div className="msg assistant" key={i}>
-              <div className="who">✦ Oracle</div>
+              <div className="who">✦ {t.oracle}</div>
               {m.content === "" && busy ? (
-                <span className="typing">the oracle is contemplating</span>
+                <span className="typing">{t.contemplating}</span>
               ) : (
                 parseSegments(m.content).map((seg, j) =>
                   seg.type === "text" ? (
@@ -304,7 +293,7 @@ export default function ChatPanel({ profile }: { profile: Profile }) {
       </div>
       {messages.length <= 2 && (
         <div className="suggestions">
-          {SUGGESTIONS.map((s) => (
+          {t.suggestions.map((s) => (
             <button key={s} type="button" className="chip" onClick={() => send(s)} disabled={busy}>
               {s}
             </button>
@@ -315,7 +304,7 @@ export default function ChatPanel({ profile }: { profile: Profile }) {
         <textarea
           rows={2}
           value={input}
-          placeholder="Ask about a year, an aspect, a decision…"
+          placeholder={t.askPh}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
@@ -325,17 +314,14 @@ export default function ChatPanel({ profile }: { profile: Profile }) {
           }}
         />
         <button className="btn-primary" onClick={() => send(input)} disabled={!input.trim()}>
-          Ask
+          {t.ask}
         </button>
       </div>
       <div className="chat-hint">
         {queuedCount > 0 ? (
-          <span className="queued-note">
-            ✦ {queuedCount === 1 ? "1 question queued" : `${queuedCount} questions queued`} — the
-            oracle will answer next
-          </span>
+          <span className="queued-note">{t.queued(queuedCount)}</span>
         ) : (
-          <span>Enter to ask · Shift+Enter for a new line — follow-up questions welcome anytime</span>
+          <span>{t.hintDefault}</span>
         )}
       </div>
     </div>

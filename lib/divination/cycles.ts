@@ -177,6 +177,10 @@ export interface TransitionPoint {
   title: string;
   why: string;
   advice: string;
+  /** raw drivers, exposed so the UI can render localized labels */
+  personalYearNumber?: number;
+  relation?: BranchRelation;
+  animal?: string;
 }
 
 const KIND_TITLE: Record<Exclude<TransitionKind, "threshold">, string> = {
@@ -259,6 +263,9 @@ export function transitionPoints(
         title: `${KIND_TITLE[kind]} — ${meta.name}`,
         why: whyFor(det),
         advice: KIND_ADVICE[kind],
+        personalYearNumber: det.personalYear.number,
+        relation: det.branch.relation,
+        animal: yearPillar(det.year).animal,
       });
     };
     push(peakI, "peak");
@@ -282,6 +289,8 @@ export function transitionPoints(
           rel === "self"
             ? "A threshold across all aspects: keep commitments deliberate, foundations tended, and changes well-prepared rather than impulsive."
             : "Friction touches every aspect this year. Choose your changes early and lead them yourself — movement you initiate goes far better than movement forced on you.",
+        relation: rel,
+        animal: pillar.animal,
       });
     }
   }

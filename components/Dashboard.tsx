@@ -4,10 +4,31 @@ import { useMemo, useState } from "react";
 import { ASPECTS, AspectId, Profile } from "@/lib/types";
 import { transitSeries } from "@/lib/divination/cycles";
 import { buildContext } from "@/lib/divination/reading";
+import {
+  aspectName,
+  lifePathLabel,
+  personalYearWord,
+  pillarLabel,
+  useLang,
+  useT,
+} from "@/lib/i18n";
 import TransitChart from "./TransitChart";
 import Hexagram from "./Hexagram";
 
+/** Bold the label portion before the first parenthesis, then the rest. */
+function ExplainerItem({ text }: { text: string }) {
+  const m = text.match(/^(.*?)([（(].*)$/s);
+  if (!m) return <>{text}</>;
+  return (
+    <>
+      <strong>{m[1].trim()}</strong> {m[2]}
+    </>
+  );
+}
+
 export default function Dashboard({ profile }: { profile: Profile }) {
+  const lang = useLang();
+  const t = useT();
   const [active, setActive] = useState<AspectId[]>(ASPECTS.map((a) => a.id));
 
   const ctx = useMemo(
@@ -31,37 +52,41 @@ export default function Dashboard({ profile }: { profile: Profile }) {
     });
   }
 
+  const pillar = pillarLabel(lang, ctx.natal.yin, ctx.natal.element, ctx.natal.animal);
+  const personalWord = personalYearWord(
+    lang,
+    ctx.personalYearNow,
+    ctx.personalYearNote.split(" — ")[0]
+  );
+
   return (
     <div className="card">
-      <h2>Your life map</h2>
-      <p className="sub">
-        Nine-, twelve- and seven-year rhythms blended into one supportiveness curve per life
-        aspect — with your critical transition points marked. Weather, not verdicts.
-      </p>
+      <h2>{t.lifeMap}</h2>
+      <p className="sub">{t.lifeMapSub}</p>
 
       <div className="profile-facts">
         <div className="fact">
-          <div className="k">Year pillar</div>
-          <div className="v">{ctx.natal.label.replace(/\s*\(.*\)/, "")}</div>
+          <div className="k">{t.factYearPillar}</div>
+          <div className="v">{pillar}</div>
           <div className="note">
             {ctx.natal.stem}
-            {ctx.natal.branch} · born {profile.birthDate}
+            {ctx.natal.branch} · {t.bornOn(profile.birthDate)}
           </div>
         </div>
         <div className="fact">
-          <div className="k">Life path</div>
+          <div className="k">{t.factLifePath}</div>
           <div className="v">{ctx.lifePath}</div>
-          <div className="note">{ctx.lifePathNote}</div>
+          <div className="note">{lifePathLabel(lang, ctx.lifePath, ctx.lifePathNote)}</div>
         </div>
         <div className="fact">
-          <div className="k">Personal year {ctx.currentYear}</div>
+          <div className="k">{t.factPersonalYear(ctx.currentYear)}</div>
           <div className="v">{ctx.personalYearNow}</div>
-          <div className="note">{ctx.personalYearNote.split(" — ")[0]}</div>
+          <div className="note">{personalWord}</div>
         </div>
       </div>
 
       <div className="chips-row">
-        <span className="chips-label">Focus the map</span>
+        <span className="chips-label">{t.focusMap}</span>
         <div className="chips">
           {ASPECTS.map((a) => (
             <button
@@ -70,10 +95,10 @@ export default function Dashboard({ profile }: { profile: Profile }) {
               className="chip"
               data-on={active.includes(a.id)}
               onClick={() => toggle(a.id)}
-              title={`Toggle ${a.name}`}
+              title={aspectName(lang, a.id)}
             >
               <span className="dot" style={{ background: `var(--series-${a.slot})` }} />
-              {a.name}
+              {aspectName(lang, a.id)}
             </button>
           ))}
         </div>
@@ -81,37 +106,31 @@ export default function Dashboard({ profile }: { profile: Profile }) {
 
       <TransitChart
         series={series}
-        title={`Supportiveness by year, ${startYear}–${endYear}`}
+        title={t.supportRange(startYear, endYear)}
         currentYear={ctx.currentYear}
         birthDate={profile.birthDate}
       />
 
       <details className="explainer" open>
-        <summary>What moves these curves?</summary>
+        <summary>{t.explainerSummary}</summary>
         <div className="body">
-          Each year&apos;s score blends three deterministic cycles computed from your birth date —
-          hover any year or marker on the chart to see which one dominates:
+          {t.explainerLead}
           <ul>
             <li>
-              <strong>The nine-year personal cycle</strong> (numerology): seed → growth → harvest →
-              release. Each aspect thrives in different phases — career peaks in years 1 and 8,
-              relationships in 2 and 6, inner growth in 7.
+              <ExplainerItem text={t.explainerNine} />
             </li>
             <li>
-              <strong>The twelve-year branch cycle</strong> (Chinese metaphysics): how each year&apos;s
-              animal sign relates to yours — harmony-triangle and combination years lift the
-              curves; clash, harm and own-sign years pull them down and mark thresholds.
+              <ExplainerItem text={t.explainerTwelve} />
             </li>
             <li>
-              <strong>The seven-year renewal rhythm</strong>: a slow bodily and energetic tide
-              anchored to your age, phase-shifted per aspect.
+              <ExplainerItem text={t.explainerSeven} />
             </li>
           </ul>
         </div>
       </details>
 
       <div className="hex-panel">
-        <p className="sub">The symbolic lens — cast at the moment you arrived:</p>
+        <p className="sub">{t.hexPanelSub}</p>
         <Hexagram cast={ctx.cast} />
       </div>
     </div>

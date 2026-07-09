@@ -2,8 +2,10 @@
 
 import { useState } from "react";
 import { Profile } from "@/lib/types";
+import { useT } from "@/lib/i18n";
 
 export default function ProfileForm({ onSubmit }: { onSubmit: (p: Profile) => void }) {
+  const t = useT();
   const [name, setName] = useState("");
   const [birthDate, setBirthDate] = useState("");
   const [birthTime, setBirthTime] = useState("");
@@ -29,18 +31,18 @@ export default function ProfileForm({ onSubmit }: { onSubmit: (p: Profile) => vo
       <div className="form-grid">
         <div className="field">
           <label htmlFor="pf-name">
-            Name <span className="opt">(optional)</span>
+            {t.fName} <span className="opt">{t.optional}</span>
           </label>
           <input
             id="pf-name"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="How shall the oracle address you?"
+            placeholder={t.fNamePh}
             autoComplete="given-name"
           />
         </div>
         <div className="field">
-          <label htmlFor="pf-date">Date of birth</label>
+          <label htmlFor="pf-date">{t.fDate}</label>
           <input
             id="pf-date"
             type="date"
@@ -51,7 +53,7 @@ export default function ProfileForm({ onSubmit }: { onSubmit: (p: Profile) => vo
         </div>
         <div className="field">
           <label htmlFor="pf-time">
-            Time of birth <span className="opt">(optional, sharpens the reading)</span>
+            {t.fTime} <span className="opt">{t.fTimeHint}</span>
           </label>
           <input
             id="pf-time"
@@ -62,31 +64,31 @@ export default function ProfileForm({ onSubmit }: { onSubmit: (p: Profile) => vo
         </div>
         <div className="field">
           <label htmlFor="pf-place">
-            Place of birth <span className="opt">(optional)</span>
+            {t.fPlace} <span className="opt">{t.optional}</span>
           </label>
           <input
             id="pf-place"
             value={birthPlace}
             onChange={(e) => setBirthPlace(e.target.value)}
-            placeholder="City, country"
+            placeholder={t.fPlacePh}
           />
         </div>
         <div className="field full">
           <label htmlFor="pf-focus">
-            What is on your mind? <span className="opt">(optional)</span>
+            {t.fFocus} <span className="opt">{t.optional}</span>
           </label>
           <textarea
             id="pf-focus"
             rows={2}
             value={focus}
             onChange={(e) => setFocus(e.target.value)}
-            placeholder="A question, a decision, a season of life you want to understand…"
+            placeholder={t.fFocusPh}
           />
         </div>
       </div>
       <div style={{ marginTop: 16 }}>
         <button className="btn-primary" type="submit" disabled={!valid}>
-          Open my life map
+          {t.openMap}
         </button>
       </div>
     </form>

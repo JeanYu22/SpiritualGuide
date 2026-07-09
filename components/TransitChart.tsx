@@ -7,13 +7,34 @@ import {
   transitionPoints,
   TransitionPoint,
 } from "@/lib/divination/cycles";
+import { yearPillar } from "@/lib/divination/bazi";
+import {
+  animalLabel,
+  aspectName,
+  kindShort,
+  personalYearWord,
+  relationNote,
+  relationShort,
+  useLang,
+  useT,
+} from "@/lib/i18n";
 
-const KIND_SHORT: Record<string, string> = {
-  peak: "peak",
-  trough: "consolidation",
-  surge: "momentum up",
-  drop: "tide turns",
-  threshold: "threshold",
+// Traditional-Chinese reconstructions of the engine's transition prose
+const KIND_TITLE_ZH: Record<string, string> = {
+  peak: "順遂之窗",
+  trough: "沉潛整固之年",
+  surge: "動能翻升",
+  drop: "潮水轉向",
+};
+const KIND_ADVICE_ZH: Record<string, string> = {
+  peak: "在此行動：啟動、承諾、談判、擴張。於前一年預作準備，方能就位。",
+  trough: "並非厄運，而是整固的時節。修補、休養、進修、儲蓄；勿強行躍進。",
+  surge: "此刻開始布局：這一年打下的基礎，將在隨後的上升中複利累積。",
+  drop: "在此年之前完成並鞏固要緊之事；帶著餘裕與彈性的計畫進入這一年。",
+};
+const THRESHOLD_ADVICE_ZH: Record<string, string> = {
+  self: "橫跨各面向的關卡：讓承諾審慎、根基常固，變動宜有備而來，勿逞一時之衝動。",
+  clash: "摩擦今年觸及每個面向。及早選定並親自主導你的變動——你發動的變化，遠勝被迫承受的變化。",
 };
 
 interface Props {
@@ -74,6 +95,8 @@ export default function TransitChart({
   currentYear,
   birthDate,
 }: Props) {
+  const lang = useLang();
+  const t = useT();
   const wrapRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const [hoverYear, setHoverYear] = useState<number | null>(null);
@@ -121,6 +144,8 @@ export default function TransitChart({
 
   const color = (slot: number) => `var(--series-${slot})`;
   const single = series.length === 1;
+  const nameOf = (aspect: AspectId) => aspectName(lang, aspect);
+  const animalOf = (year: number) => animalLabel(lang, yearPillar(year).animal);
 
   const pathOf = (s: TransitSeries) =>
     smoothPath(s.points.map((p) => ({ x: xOf(p.year), y: yOf(p.value) })));
@@ -173,14 +198,14 @@ export default function TransitChart({
       setHoverYear(null);
       return;
     }
-    const t = (vx - M.left) / (W - M.left - M.right);
-    const year = Math.round(x0 + t * (x1 - x0));
+    const tt = (vx - M.left) / (W - M.left - M.right);
+    const year = Math.round(x0 + tt * (x1 - x0));
     setHoverYear(Math.min(x1, Math.max(x0, year)));
     if (!marker) placeTip(e.clientX, e.clientY);
   }
 
-  // hovered rows carry each curve's value AND its strongest driver this year,
-  // so every level on the chart comes with its supporting reason
+  // hovered rows carry each curve's value AND its detail, so every level on the
+  // chart comes with a localized supporting reason
   const hovered =
     hoverYear == null
       ? null
@@ -189,10 +214,11 @@ export default function TransitChart({
             ? aspectScoreDetail(birthDate, s.aspect as AspectId, hoverYear)
             : null;
           return {
-            name: s.name,
+            aspect: s.aspect,
+            name: nameOf(s.aspect as AspectId),
             slot: s.slot,
             value: s.points.find((p) => p.year === hoverYear)?.value,
-            dominant: detail?.dominant,
+            detail,
           };
         });
 
@@ -200,6 +226,68 @@ export default function TransitChart({
     hoverYear != null && birthDate
       ? aspectScoreDetail(birthDate, series[0].aspect as AspectId, hoverYear)
       : null;
+
+  // ---- localized driver / dominant labels ----
+  function pyLabel(d: { number: number; label: string }) {
+    return lang === "en"
+      ? d.label
+      : `${t.personalYearWord(d.number)} — ${personalYearWord(lang, d.number, "")}`;
+  }
+  function branchLabel(year: number, d: { relation: import("@/lib/divination/bazi").BranchRelation; label: string }) {
+    if (lang === "en") return d.label;
+    const rel = d.relation === "neutral" ? t.neutralToSign : relationShort(lang, d.relation, "");
+    return `${t.animalYearSuffix(animalOf(year))} — ${rel}`;
+  }
+  function rhythmLabel(d: { points: number; label: string }) {
+    return lang === "en" ? d.label : t.sevenRhythm(d.points >= 0);
+  }
+  function dominantOf(detail: import("@/lib/divination/cycles").ScoreDetail) {
+    if (lang === "en") return detail.dominant;
+    const rows = [
+      { k: "py", pts: detail.personalYear.points },
+      { k: "br", pts: detail.branch.points },
+      { k: "ry", pts: detail.rhythm.points },
+    ].sort((a, b) => Math.abs(b.pts) - Math.abs(a.pts));
+    const top = rows[0];
+    if (top.k === "py") {
+      const word = personalYearWord(lang, detail.personalYear.number, "");
+      return `個人流年 ${detail.personalYear.number}（${word}）${top.pts >= 0 ? "抬升" : "需耐心以待"}此面向`;
+    }
+    if (top.k === "br") {
+      const rel =
+        detail.branch.relation === "neutral"
+          ? t.neutralToSign
+          : relationShort(lang, detail.branch.relation, "");
+      return `${t.animalYearSuffix(animalOf(detail.year))}：${rel}`;
+    }
+    return `七年身心節律運行${top.pts >= 0 ? "偏高" : "偏低"}`;
+  }
+
+  // ---- localized marker prose ----
+  function markerTitle(mk: TransitionPoint) {
+    if (lang === "en") return mk.title;
+    if (mk.aspect === null) {
+      return `${mk.relation === "self" ? "本命年" : "相沖之年"}（${animalLabel(lang, mk.animal ?? "")}）`;
+    }
+    return `${KIND_TITLE_ZH[mk.kind]} — ${nameOf(mk.aspect)}`;
+  }
+  function markerWhy(mk: TransitionPoint) {
+    if (lang === "en") return `Why: ${mk.why}.`;
+    if (mk.aspect === null && mk.relation) {
+      return `何以：${relationNote(lang, mk.relation, mk.why)}。`;
+    }
+    const word = personalYearWord(lang, mk.personalYearNumber ?? 1, "");
+    const rel =
+      mk.relation && mk.relation !== "neutral"
+        ? `；${t.animalYearSuffix(animalLabel(lang, mk.animal ?? ""))}${relationShort(lang, mk.relation, "")}`
+        : "";
+    return `何以：個人流年 ${mk.personalYearNumber}（${word}）${rel}。`;
+  }
+  function markerAdvice(mk: TransitionPoint) {
+    if (lang === "en") return mk.advice;
+    if (mk.aspect === null) return THRESHOLD_ADVICE_ZH[mk.relation ?? "self"] ?? mk.advice;
+    return KIND_ADVICE_ZH[mk.kind] ?? mk.advice;
+  }
 
   const markerShape = (t: TransitionPoint) => {
     const cx = xOf(t.year);
@@ -233,6 +321,18 @@ export default function TransitChart({
     }
   };
 
+  // sorted, localized driver rows for the single-aspect crosshair breakdown
+  const driverRows = hoverDrivers
+    ? [
+        { label: pyLabel(hoverDrivers.personalYear), points: hoverDrivers.personalYear.points },
+        {
+          label: branchLabel(hoverYear as number, hoverDrivers.branch),
+          points: hoverDrivers.branch.points,
+        },
+        { label: rhythmLabel(hoverDrivers.rhythm), points: hoverDrivers.rhythm.points },
+      ].sort((a, b) => Math.abs(b.points) - Math.abs(a.points))
+    : [];
+
   return (
     <div className="viz-root" ref={wrapRef}>
       {title && <p className="viz-title">{title}</p>}
@@ -241,7 +341,7 @@ export default function TransitChart({
           {series.map((s) => (
             <span className="key" key={s.aspect} role="listitem">
               <span className="swatch" style={{ background: color(s.slot) }} />
-              {s.name}
+              {nameOf(s.aspect as AspectId)}
             </span>
           ))}
         </div>
@@ -332,7 +432,7 @@ export default function TransitChart({
               fontSize={10.5}
               fill="var(--ink-muted)"
             >
-              now
+              {t.now}
             </text>
           </g>
         )}
@@ -459,34 +559,40 @@ export default function TransitChart({
       {stripPoints.length > 0 && (
         <div className="viz-transitions">
           <div className="viz-transitions-head">
-            Critical transitions
-            <span className="hint">hover for what each asks of you</span>
+            {t.criticalTransitions}
+            <span className="hint">{t.hoverForAsk}</span>
           </div>
           <div className="viz-transitions-row">
-            {stripPoints.map((t, i) => (
+            {stripPoints.map((tp, i) => (
               <button
-                key={`strip-${t.year}-${t.kind}-${t.aspect ?? "all"}-${i}`}
+                key={`strip-${tp.year}-${tp.kind}-${tp.aspect ?? "all"}-${i}`}
                 type="button"
-                className={`tp-pill tp-${t.kind}`}
+                className={`tp-pill tp-${tp.kind}`}
                 onPointerEnter={(e) => {
-                  setMarker(t);
+                  setMarker(tp);
                   placeTip(e.clientX, e.clientY);
                 }}
                 onPointerLeave={() => setMarker(null)}
                 onClick={(e) => {
-                  setMarker(marker === t ? null : t);
+                  setMarker(marker === tp ? null : tp);
                   placeTip(e.clientX, e.clientY);
                 }}
               >
-                {t.aspect !== null && (
-                  <span className="dot" style={{ background: color(t.slot ?? 5) }} />
+                {tp.aspect !== null && (
+                  <span className="dot" style={{ background: color(tp.slot ?? 5) }} />
                 )}
-                {t.aspect === null && <span className="th-glyph">◆</span>}
-                <b>{t.year}</b>
+                {tp.aspect === null && <span className="th-glyph">◆</span>}
+                <b>{tp.year}</b>
                 <span className="lbl">
-                  {t.aspect === null
-                    ? t.title.replace(/\s*\(.*\)/, "").toLowerCase()
-                    : `${t.aspectName} ${KIND_SHORT[t.kind]}`}
+                  {tp.aspect === null
+                    ? lang === "zh"
+                      ? tp.relation === "self"
+                        ? "本命年"
+                        : "相沖之年"
+                      : tp.title.replace(/\s*\(.*\)/, "").toLowerCase()
+                    : lang === "zh"
+                    ? `${nameOf(tp.aspect)}${kindShort(lang, tp.kind)}`
+                    : `${nameOf(tp.aspect)} ${kindShort(lang, tp.kind)}`}
                 </span>
               </button>
             ))}
@@ -497,10 +603,16 @@ export default function TransitChart({
       {/* marker legend */}
       {transitions.length > 0 && (
         <div className="viz-markerkey">
-          <span><i className="mk mk-peak" /> supportive window</span>
-          <span><i className="mk mk-trough" /> consolidation</span>
-          <span><i className="mk mk-threshold" /> threshold year</span>
-          {crowded && <span className="hint">focus 1–2 aspects to see every turn</span>}
+          <span>
+            <i className="mk mk-peak" /> {t.keyPeak}
+          </span>
+          <span>
+            <i className="mk mk-trough" /> {t.keyTrough}
+          </span>
+          <span>
+            <i className="mk mk-threshold" /> {t.keyThreshold}
+          </span>
+          {crowded && <span className="hint">{t.focusToSeeTurns}</span>}
         </div>
       )}
 
@@ -511,9 +623,9 @@ export default function TransitChart({
             {marker.year}
             {marker.value != null ? ` · ${marker.value}/100` : ""}
           </div>
-          <div className="t-title">{marker.title}</div>
-          <div className="t-why">Why: {marker.why}.</div>
-          <div className="t-advice">{marker.advice}</div>
+          <div className="t-title">{markerTitle(marker)}</div>
+          <div className="t-why">{markerWhy(marker)}</div>
+          <div className="t-advice">{markerAdvice(marker)}</div>
         </div>
       )}
 
@@ -522,43 +634,40 @@ export default function TransitChart({
         <div className="viz-tooltip" style={{ left: tipPos.x, top: tipPos.y }}>
           <div className="t-year">
             {hoverYear}
-            {currentYear === hoverYear ? " · now" : ""}
+            {currentYear === hoverYear ? ` · ${t.now}` : ""}
           </div>
           {hovered.map(
             (h) =>
               h.value != null && (
-                <div className="t-block" key={h.name}>
+                <div className="t-block" key={h.aspect}>
                   <div className="t-row">
                     <span className="dot" style={{ background: color(h.slot) }} />
                     <span>{h.name}</span>
                     <span className="val">{h.value}</span>
                   </div>
-                  {!single && h.dominant && <div className="t-dom">{h.dominant}</div>}
+                  {!single && h.detail && <div className="t-dom">{dominantOf(h.detail)}</div>}
                 </div>
               )
           )}
           {hoverDrivers && single && (
             <div className="t-drivers">
-              <div className="t-drivers-head">Why this level:</div>
-              {[hoverDrivers.personalYear, hoverDrivers.branch, hoverDrivers.rhythm]
-                .slice()
-                .sort((a, b) => Math.abs(b.points) - Math.abs(a.points))
-                .map((d) => (
-                  <div className="t-driver-row" key={d.label}>
-                    <span>{d.label}</span>
-                    <span className={`pts ${d.points >= 0 ? "up" : "down"}`}>
-                      {d.points >= 0 ? "+" : ""}
-                      {d.points}
-                    </span>
-                  </div>
-                ))}
+              <div className="t-drivers-head">{t.whyThisLevel}</div>
+              {driverRows.map((d) => (
+                <div className="t-driver-row" key={d.label}>
+                  <span>{d.label}</span>
+                  <span className={`pts ${d.points >= 0 ? "up" : "down"}`}>
+                    {d.points >= 0 ? "+" : ""}
+                    {d.points}
+                  </span>
+                </div>
+              ))}
             </div>
           )}
           {hoverDrivers && !single && (
             <div className="t-drivers">
-              <div className="t-drivers-head">Forces this year:</div>
-              <div>{hoverDrivers.personalYear.label}</div>
-              <div>{hoverDrivers.branch.label}</div>
+              <div className="t-drivers-head">{t.forcesThisYear}</div>
+              <div>{pyLabel(hoverDrivers.personalYear)}</div>
+              <div>{branchLabel(hoverYear as number, hoverDrivers.branch)}</div>
             </div>
           )}
         </div>
