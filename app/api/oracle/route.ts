@@ -94,8 +94,33 @@ export async function POST(req: NextRequest) {
   const client = new Anthropic();
   const encoder = new TextEncoder();
 
+  // if the AI call fails, we fall back to the deterministic offline reading so
+  // the seeker always gets something — prefixed with a plain note on why the
+  // live oracle was unavailable, so misconfiguration is diagnosable
+  const isFirstTurn = messages.filter((m) => m.role === "user").length <= 1;
+  const offlineText = isFirstTurn
+    ? localReading(profile, question, ctx)
+    : answerFollowUp(profile, question, ctx);
+
+  function diagnose(err: unknown): string {
+    const status = (err as { status?: number })?.status;
+    if (status === 401)
+      return "the Anthropic API key was rejected (missing, invalid, or revoked)";
+    if (status === 403) return "the Anthropic API key lacks permission for this model";
+    if (status === 429) return "the Anthropic API rate limit or spending cap was hit";
+    if (status === 400) {
+      const msg = String((err as { message?: string })?.message ?? "");
+      if (/credit|billing|balance|quota/i.test(msg))
+        return "the Anthropic account has no available credits — add billing in the Console";
+      return "the request was rejected by the Anthropic API";
+    }
+    if (status && status >= 500) return "the Anthropic API is temporarily unavailable";
+    return "the server could not reach the Anthropic API (network, proxy, or missing key)";
+  }
+
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
+      let emitted = false;
       try {
         const msgStream = client.messages.stream({
           model: "claude-opus-4-8",
@@ -112,6 +137,7 @@ export async function POST(req: NextRequest) {
         });
         for await (const event of msgStream) {
           if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
+            emitted = true;
             controller.enqueue(encoder.encode(event.delta.text));
           }
         }
@@ -124,12 +150,21 @@ export async function POST(req: NextRequest) {
           );
         }
       } catch (err) {
-        controller.enqueue(
-          encoder.encode(
-            "\n\n*The oracle's connection wavered — please try again in a moment.*"
-          )
-        );
         console.error("oracle stream error", err);
+        const reason = diagnose(err);
+        if (emitted) {
+          // AI already produced text, then broke mid-stream — just note it
+          controller.enqueue(
+            encoder.encode(`\n\n> *The live oracle was interrupted (${reason}).*`)
+          );
+        } else {
+          // nothing sent yet — deliver the full offline reading with a header note
+          controller.enqueue(
+            encoder.encode(
+              `> *The live AI oracle is unavailable — ${reason}. Reading below is from the offline Inner Compass engine.*\n\n${offlineText}`
+            )
+          );
+        }
       } finally {
         controller.close();
       }
