@@ -78,7 +78,7 @@ const FACTOR_META: [RegExp, { kind: string; icon: string }][] = [
   [/^opportunit/i, { kind: "opp", icon: "☀" }],
   [/^obstacle/i, { kind: "obs", icon: "⛰" }],
   [/^supporting|^resources|^allies/i, { kind: "res", icon: "◈" }],
-  [/^watch/i, { kind: "watch", icon: "⚠" }],
+  [/^watch|^drawback|^risk/i, { kind: "watch", icon: "⚠" }],
   [/^next step/i, { kind: "next", icon: "➤" }],
 ];
 
@@ -181,48 +181,82 @@ export default function ChatPanel({ profile }: { profile: Profile }) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
+  const [queuedCount, setQueuedCount] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
   const startedRef = useRef(false);
+
+  // canonical conversation state lives in refs so questions asked while the
+  // oracle is still answering are queued and answered next, never dropped
+  const historyRef = useRef<ChatMessage[]>([]);
+  const queueRef = useRef<string[]>([]);
+  const streamRef = useRef<string | null>(null);
+  const busyRef = useRef(false);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages]);
 
-  async function send(text: string) {
-    const question = text.trim();
-    if (!question || busy) return;
-    const nextMessages: ChatMessage[] = [...messages, { role: "user", content: question }];
-    setMessages([...nextMessages, { role: "assistant", content: "" }]);
-    setInput("");
+  function render() {
+    const streaming: ChatMessage[] =
+      streamRef.current != null ? [{ role: "assistant", content: streamRef.current }] : [];
+    const queued: ChatMessage[] = queueRef.current.map((q) => ({ role: "user", content: q }));
+    setMessages([...historyRef.current, ...streaming, ...queued]);
+    setQueuedCount(queueRef.current.length);
+  }
+
+  async function runQueue() {
+    busyRef.current = true;
     setBusy(true);
     try {
-      const res = await fetch("/api/oracle", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ profile, messages: nextMessages }),
-      });
-      if (!res.ok || !res.body) throw new Error(`oracle returned ${res.status}`);
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let acc = "";
-      for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        acc += decoder.decode(value, { stream: true });
-        const snapshot = acc;
-        setMessages([...nextMessages, { role: "assistant", content: snapshot }]);
+      while (queueRef.current.length) {
+        const question = queueRef.current.shift()!;
+        historyRef.current = [...historyRef.current, { role: "user", content: question }];
+        streamRef.current = "";
+        render();
+        try {
+          const res = await fetch("/api/oracle", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ profile, messages: historyRef.current }),
+          });
+          if (!res.ok || !res.body) throw new Error(`oracle returned ${res.status}`);
+          const reader = res.body.getReader();
+          const decoder = new TextDecoder();
+          let acc = "";
+          for (;;) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            acc += decoder.decode(value, { stream: true });
+            streamRef.current = acc;
+            render();
+          }
+          historyRef.current = [...historyRef.current, { role: "assistant", content: acc }];
+        } catch {
+          historyRef.current = [
+            ...historyRef.current,
+            {
+              role: "assistant",
+              content: "*The oracle's connection wavered — please try again in a moment.*",
+            },
+          ];
+        } finally {
+          streamRef.current = null;
+          render();
+        }
       }
-    } catch {
-      setMessages([
-        ...nextMessages,
-        {
-          role: "assistant",
-          content: "*The oracle's connection wavered — please try again in a moment.*",
-        },
-      ]);
     } finally {
+      busyRef.current = false;
       setBusy(false);
     }
+  }
+
+  function send(text: string) {
+    const question = text.trim();
+    if (!question) return;
+    setInput("");
+    queueRef.current.push(question);
+    render();
+    if (!busyRef.current) void runQueue();
   }
 
   // opening reading: ask once on mount, seeded by the profile's focus
@@ -253,7 +287,7 @@ export default function ChatPanel({ profile }: { profile: Profile }) {
           ) : (
             <div className="msg assistant" key={i}>
               <div className="who">✦ Oracle</div>
-              {m.content === "" && busy && i === messages.length - 1 ? (
+              {m.content === "" && busy ? (
                 <span className="typing">the oracle is contemplating</span>
               ) : (
                 parseSegments(m.content).map((seg, j) =>
@@ -290,9 +324,19 @@ export default function ChatPanel({ profile }: { profile: Profile }) {
             }
           }}
         />
-        <button className="btn-primary" onClick={() => send(input)} disabled={busy || !input.trim()}>
+        <button className="btn-primary" onClick={() => send(input)} disabled={!input.trim()}>
           Ask
         </button>
+      </div>
+      <div className="chat-hint">
+        {queuedCount > 0 ? (
+          <span className="queued-note">
+            ✦ {queuedCount === 1 ? "1 question queued" : `${queuedCount} questions queued`} — the
+            oracle will answer next
+          </span>
+        ) : (
+          <span>Enter to ask · Shift+Enter for a new line — follow-up questions welcome anytime</span>
+        )}
       </div>
     </div>
   );

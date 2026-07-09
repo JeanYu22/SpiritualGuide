@@ -140,14 +140,14 @@ export default function TransitChart({
     tickYears.splice(tickYears.length - 2, 1);
   }
 
-  // with many curves visible, mark only the strongest signals (peaks + thresholds)
+  // with many curves visible, mark the extremes (peaks + troughs + thresholds)
   // so the critical transitions stay readable; focused views get every marker
   const crowded = series.length > 2;
   const seriesMarkers = transitions.filter(
     (t) =>
       t.aspect !== null &&
       series.some((s) => s.aspect === t.aspect) &&
-      (!crowded || t.kind === "peak")
+      (!crowded || t.kind === "peak" || t.kind === "trough")
   );
   const thresholds = transitions.filter((t) => t.aspect === null);
   const stripPoints = [...seriesMarkers, ...thresholds].sort((a, b) => a.year - b.year);
@@ -163,7 +163,8 @@ export default function TransitChart({
   }
 
   function onMove(e: React.PointerEvent<SVGSVGElement>) {
-    if (marker) return; // marker tooltip takes precedence
+    // keep tracking even while a marker tooltip is up, so the crosshair
+    // reappears the instant the pointer leaves the marker
     const svg = svgRef.current;
     if (!svg) return;
     const rect = svg.getBoundingClientRect();
@@ -175,19 +176,26 @@ export default function TransitChart({
     const t = (vx - M.left) / (W - M.left - M.right);
     const year = Math.round(x0 + t * (x1 - x0));
     setHoverYear(Math.min(x1, Math.max(x0, year)));
-    placeTip(e.clientX, e.clientY);
+    if (!marker) placeTip(e.clientX, e.clientY);
   }
 
+  // hovered rows carry each curve's value AND its strongest driver this year,
+  // so every level on the chart comes with its supporting reason
   const hovered =
     hoverYear == null
       ? null
-      : series.map((s) => ({
-          name: s.name,
-          slot: s.slot,
-          value: s.points.find((p) => p.year === hoverYear)?.value,
-        }));
+      : series.map((s) => {
+          const detail = birthDate
+            ? aspectScoreDetail(birthDate, s.aspect as AspectId, hoverYear)
+            : null;
+          return {
+            name: s.name,
+            slot: s.slot,
+            value: s.points.find((p) => p.year === hoverYear)?.value,
+            dominant: detail?.dominant,
+          };
+        });
 
-  // drivers behind the hovered year (personal-year + animal-year labels are aspect-independent)
   const hoverDrivers =
     hoverYear != null && birthDate
       ? aspectScoreDetail(birthDate, series[0].aspect as AspectId, hoverYear)
@@ -410,6 +418,7 @@ export default function TransitChart({
               style={{ cursor: "help" }}
             >
               <circle cx={cx} cy={cy} r={13} fill="transparent" />
+              <circle className="viz-halo" cx={cx} cy={cy} r={10} fill="var(--accent)" />
               <path
                 d={`M${cx},${cy - 6} L${cx + 6},${cy} L${cx},${cy + 6} L${cx - 6},${cy} Z`}
                 fill="var(--accent)"
@@ -432,6 +441,15 @@ export default function TransitChart({
             style={{ cursor: "help" }}
           >
             <circle cx={xOf(t.year)} cy={yOf(t.value ?? 0)} r={13} fill="transparent" />
+            {t.kind === "peak" && (
+              <circle
+                className="viz-halo"
+                cx={xOf(t.year)}
+                cy={yOf(t.value ?? 0)}
+                r={10}
+                fill={color(t.slot ?? 5)}
+              />
+            )}
             {markerShape(t)}
           </g>
         ))}
@@ -480,7 +498,7 @@ export default function TransitChart({
       {transitions.length > 0 && (
         <div className="viz-markerkey">
           <span><i className="mk mk-peak" /> supportive window</span>
-          {!crowded && <span><i className="mk mk-trough" /> consolidation</span>}
+          <span><i className="mk mk-trough" /> consolidation</span>
           <span><i className="mk mk-threshold" /> threshold year</span>
           {crowded && <span className="hint">focus 1–2 aspects to see every turn</span>}
         </div>
@@ -509,10 +527,13 @@ export default function TransitChart({
           {hovered.map(
             (h) =>
               h.value != null && (
-                <div className="t-row" key={h.name}>
-                  <span className="dot" style={{ background: color(h.slot) }} />
-                  <span>{h.name}</span>
-                  <span className="val">{h.value}</span>
+                <div className="t-block" key={h.name}>
+                  <div className="t-row">
+                    <span className="dot" style={{ background: color(h.slot) }} />
+                    <span>{h.name}</span>
+                    <span className="val">{h.value}</span>
+                  </div>
+                  {!single && h.dominant && <div className="t-dom">{h.dominant}</div>}
                 </div>
               )
           )}
@@ -535,7 +556,9 @@ export default function TransitChart({
           )}
           {hoverDrivers && !single && (
             <div className="t-drivers">
-              {hoverDrivers.personalYear.label} · {hoverDrivers.branch.label}
+              <div className="t-drivers-head">Forces this year:</div>
+              <div>{hoverDrivers.personalYear.label}</div>
+              <div>{hoverDrivers.branch.label}</div>
             </div>
           )}
         </div>
