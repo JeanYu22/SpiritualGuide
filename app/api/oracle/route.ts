@@ -81,8 +81,8 @@ export async function POST(req: NextRequest) {
     // question-aware answers on every follow-up.
     const isFirstTurn = messages.filter((m) => m.role === "user").length <= 1;
     const text = isFirstTurn
-      ? localReading(profile, question, ctx)
-      : answerFollowUp(profile, question, ctx);
+      ? localReading(profile, question, ctx, lang)
+      : answerFollowUp(profile, question, ctx, lang);
     const encoder = new TextEncoder();
     const stream = new ReadableStream<Uint8Array>({
       async start(controller) {
@@ -107,23 +107,37 @@ export async function POST(req: NextRequest) {
   // live oracle was unavailable, so misconfiguration is diagnosable
   const isFirstTurn = messages.filter((m) => m.role === "user").length <= 1;
   const offlineText = isFirstTurn
-    ? localReading(profile, question, ctx)
-    : answerFollowUp(profile, question, ctx);
+    ? localReading(profile, question, ctx, lang)
+    : answerFollowUp(profile, question, ctx, lang);
 
   function diagnose(err: unknown): string {
     const status = (err as { status?: number })?.status;
+    const zh = lang === "zh";
     if (status === 401)
-      return "the Anthropic API key was rejected (missing, invalid, or revoked)";
-    if (status === 403) return "the Anthropic API key lacks permission for this model";
-    if (status === 429) return "the Anthropic API rate limit or spending cap was hit";
+      return zh
+        ? "Anthropic API 金鑰遭拒（缺漏、無效或已撤銷）"
+        : "the Anthropic API key was rejected (missing, invalid, or revoked)";
+    if (status === 403)
+      return zh
+        ? "此 API 金鑰無權使用這個模型（可用 ORACLE_MODEL 環境變數改用其他模型）"
+        : "the Anthropic API key lacks permission for this model (set ORACLE_MODEL to a model it can use)";
+    if (status === 429)
+      return zh
+        ? "已觸及 Anthropic API 的速率上限或用量上限"
+        : "the Anthropic API rate limit or spending cap was hit";
     if (status === 400) {
       const msg = String((err as { message?: string })?.message ?? "");
       if (/credit|billing|balance|quota/i.test(msg))
-        return "the Anthropic account has no available credits — add billing in the Console";
-      return "the request was rejected by the Anthropic API";
+        return zh
+          ? "Anthropic 帳戶沒有可用額度——請至 Console 開通付費"
+          : "the Anthropic account has no available credits — add billing in the Console";
+      return zh ? "請求遭 Anthropic API 拒絕" : "the request was rejected by the Anthropic API";
     }
-    if (status && status >= 500) return "the Anthropic API is temporarily unavailable";
-    return "the server could not reach the Anthropic API (network, proxy, or missing key)";
+    if (status && status >= 500)
+      return zh ? "Anthropic API 暫時無法使用" : "the Anthropic API is temporarily unavailable";
+    return zh
+      ? "伺服器無法連上 Anthropic API（網路、代理或缺少金鑰）"
+      : "the server could not reach the Anthropic API (network, proxy, or missing key)";
   }
 
   const stream = new ReadableStream<Uint8Array>({
@@ -131,7 +145,9 @@ export async function POST(req: NextRequest) {
       let emitted = false;
       try {
         const msgStream = client.messages.stream({
-          model: "claude-opus-4-8",
+          // configurable so a key without Opus access can fall back to a model
+          // it can reach (e.g. Sonnet) via the ORACLE_MODEL env var
+          model: process.env.ORACLE_MODEL || "claude-opus-4-8",
           max_tokens: 16000,
           thinking: { type: "adaptive" },
           system: [
@@ -163,13 +179,19 @@ export async function POST(req: NextRequest) {
         if (emitted) {
           // AI already produced text, then broke mid-stream — just note it
           controller.enqueue(
-            encoder.encode(`\n\n> *The live oracle was interrupted (${reason}).*`)
+            encoder.encode(
+              lang === "zh"
+                ? `\n\n> *即時神諭中斷了（${reason}）。*`
+                : `\n\n> *The live oracle was interrupted (${reason}).*`
+            )
           );
         } else {
           // nothing sent yet — deliver the full offline reading with a header note
           controller.enqueue(
             encoder.encode(
-              `> *The live AI oracle is unavailable — ${reason}. Reading below is from the offline Inner Compass engine.*\n\n${offlineText}`
+              lang === "zh"
+                ? `> *即時 AI 神諭暫時無法使用——${reason}。以下解讀由離線的「內在羅盤」引擎產生。*\n\n${offlineText}`
+                : `> *The live AI oracle is unavailable — ${reason}. Reading below is from the offline Inner Compass engine.*\n\n${offlineText}`
             )
           );
         }

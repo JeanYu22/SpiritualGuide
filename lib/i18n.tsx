@@ -7,16 +7,20 @@
  * `useT()` returns the string table for that language. Static UI copy lives
  * in the `EN` / `ZH` tables (same shape, enforced by the `Strings` type).
  * Divination *labels* (aspect names, elements, zodiac animals, cycle themes,
- * branch relations) are translated via the exported data maps so the chart,
- * dashboard facts and tooltips read entirely in the chosen language.
- *
- * Engine-generated prose (the offline "Inner Compass" readings) stays English
- * by design; the live AI oracle answers in the selected language.
+ * branch relations) are translated via helpers that source the shared
+ * Traditional-Chinese data living in the divination modules, so the chart,
+ * dashboard facts, tooltips and offline readings stay in one voice.
  */
 
 import { createContext, useContext } from "react";
-import { AspectId } from "./types";
-import { BranchRelation } from "./divination/bazi";
+import { ASPECTS, AspectId } from "./types";
+import {
+  ANIMAL_ZH,
+  BranchRelation,
+  ELEMENT_ZH,
+  RELATION_NOTES_ZH,
+} from "./divination/bazi";
+import { LIFE_PATH_THEMES_ZH, PERSONAL_YEAR_WORD_ZH } from "./divination/numerology";
 import { TransitionKind } from "./divination/cycles";
 
 export type Lang = "en" | "zh";
@@ -221,23 +225,23 @@ const ZH: Strings = {
   newSeeker: "新的問卜者",
   themeLabel: "切換明暗主題",
 
-  heroLead: "在規劃之前，先看見你",
-  heroEm: "人生的四季",
+  heroLead: "在規劃人生之前，先看見它的",
+  heroEm: "四季流轉",
   heroTail: "",
   heroBody:
-    "這是一座以古老傳統解讀你問題的神諭，再將相同的循環繪成清晰、系統化的曲線——讓你能為關卡之年預作準備，並在順遂之年果斷行動。",
+    "祂以古老傳統解讀你的提問，再將同一套生命循環化為清晰而有條理的曲線——讓你能為關卡之年預作準備，並在順遂之年把握時機、果斷而行。",
   lensSymbolTitle: "象徵之鏡",
   lensSymbolBody:
-    "《易經》卦象、中國年柱、吠陀節律與生命靈數——神諭會選擇最貼合你問題的傳統，並告訴你原因。",
+    "《易經》卦象、中國年柱、吠陀節律與生命靈數——神諭會挑選最貼合你提問的傳統，並告訴你為何如此。",
   lensSystemTitle: "系統之鏡",
   lensSystemBody:
-    "你的九年、十二年與七年循環化為流年曲線，每一個關鍵轉折點都被標示並加以說明。",
-  lensCounselTitle: "諮議之言",
+    "將你的九年、十二年與七年循環化為流年曲線，一一標示並說明每一個關鍵轉折。",
+  lensCounselTitle: "行動的建言",
   lensCounselBody:
-    "每次解讀都以機遇、阻礙、助力資源與需留意之處作結——並附上你可據以規劃的具體行動。",
+    "每一次解讀，都以機遇、阻礙、助力資源與需留意之處作結，並附上你可以據以規劃的具體行動。",
   begin: "開始",
-  beginSub: "你的出生資料只會留存在你的瀏覽器中，僅用於計算你的解讀。",
-  disclaimer: "SpiritualGuide 提供的是反思性的指引，而非預測或專業建議。",
+  beginSub: "你的出生資料只會留在你的瀏覽器裡，僅用於推算你的解讀。",
+  disclaimer: "SpiritualGuide 提供的是啟發反思的指引，而非預測或專業建議。",
 
   optional: "（可選）",
   fName: "姓名",
@@ -253,7 +257,7 @@ const ZH: Strings = {
 
   lifeMap: "你的人生地圖",
   lifeMapSub:
-    "九年、十二年與七年的節律，融合成每個人生面向的一條順遂度曲線——並標示出你的關鍵轉折點。是氣候，而非定論。",
+    "九年、十二年與七年的節律，交融成每個人生面向的一條順遂度曲線，並為你標出關鍵的轉折點。這是天氣，不是斷語。",
   factYearPillar: "年柱",
   factLifePath: "生命靈數",
   factPersonalYear: (y) => `${y} 個人流年`,
@@ -262,7 +266,7 @@ const ZH: Strings = {
   supportRange: (a, b) => `${a}–${b} 年度順遂度`,
   explainerSummary: "是什麼牽動這些曲線？",
   explainerLead:
-    "每一年的分數，融合了三種由你出生日期推算出的確定性循環——將游標移到圖上任一年份或標記，即可看見何者主導：",
+    "每一年的分數，都由三種依你出生日期推算的循環交織而成——把游標移到圖上任一年份或標記，就能看見當年由何者主導：",
   explainerNine:
     "九年個人循環（生命靈數）：播種 → 生長 → 收成 → 放下。各面向在不同階段各擅勝場——事業在第 1、8 年登峰，感情在第 2、6 年，內在成長在第 7 年。",
   explainerTwelve:
@@ -277,7 +281,7 @@ const ZH: Strings = {
 
   consult: "求問神諭",
   consultSub:
-    "詮釋之鏡——可就任何面向、年份或抉擇發問。神諭會選擇最貼合你問題的傳統。",
+    "詮釋之鏡——任何面向、年份或抉擇都可以問。神諭會挑選最貼合你提問的傳統來回應。",
   oracle: "神諭",
   contemplating: "神諭正在沉思",
   suggestions: [
@@ -317,55 +321,16 @@ const STRINGS: Record<Lang, Strings> = { en: EN, zh: ZH };
 /* Divination label maps                                               */
 /* ------------------------------------------------------------------ */
 
-const ASPECT_NAME: Record<Lang, Record<AspectId, string>> = {
-  en: {
-    career: "Career & Purpose",
-    wealth: "Wealth & Resources",
-    relationships: "Relationships",
-    health: "Health & Vitality",
-    growth: "Growth & Wisdom",
-  },
-  zh: {
-    career: "事業與志向",
-    wealth: "財富與資源",
-    relationships: "感情關係",
-    health: "健康與活力",
-    growth: "成長與智慧",
-  },
-};
-
 export function aspectName(lang: Lang, id: AspectId): string {
-  return ASPECT_NAME[lang][id];
+  const a = ASPECTS.find((x) => x.id === id)!;
+  return lang === "zh" ? a.nameZh : a.name;
 }
-
-const ELEMENT_ZH: Record<string, string> = {
-  Wood: "木",
-  Fire: "火",
-  Earth: "土",
-  Metal: "金",
-  Water: "水",
-};
-
-const ANIMAL_ZH: Record<string, string> = {
-  Rat: "鼠",
-  Ox: "牛",
-  Tiger: "虎",
-  Rabbit: "兔",
-  Dragon: "龍",
-  Snake: "蛇",
-  Horse: "馬",
-  Goat: "羊",
-  Monkey: "猴",
-  Rooster: "雞",
-  Dog: "狗",
-  Pig: "豬",
-};
 
 export const animalLabel = (lang: Lang, animal: string): string =>
   lang === "zh" ? ANIMAL_ZH[animal] ?? animal : animal;
 
 export const elementLabel = (lang: Lang, element: string): string =>
-  lang === "zh" ? ELEMENT_ZH[element] ?? element : element;
+  lang === "zh" ? ELEMENT_ZH[element as keyof typeof ELEMENT_ZH] ?? element : element;
 
 /** Localized natal/year pillar label, e.g. "陰火蛇" or "Yin Fire Snake". */
 export function pillarLabel(
@@ -375,56 +340,20 @@ export function pillarLabel(
   animal: string
 ): string {
   if (lang === "zh") {
-    return `${yin ? "陰" : "陽"}${ELEMENT_ZH[element] ?? element}${ANIMAL_ZH[animal] ?? animal}`;
+    return `${yin ? "陰" : "陽"}${ELEMENT_ZH[element as keyof typeof ELEMENT_ZH] ?? element}${
+      ANIMAL_ZH[animal] ?? animal
+    }`;
   }
   return `${yin ? "Yin" : "Yang"} ${element} ${animal}`;
 }
-
-// personal-year theme keyword (the short word before " — " in the full theme)
-const PERSONAL_YEAR_WORD_ZH: Record<number, string> = {
-  1: "播種",
-  2: "萌芽",
-  3: "抽長",
-  4: "扎根",
-  5: "分枝",
-  6: "開花",
-  7: "成熟",
-  8: "收成",
-  9: "化育",
-};
 
 export function personalYearWord(lang: Lang, n: number, enWord: string): string {
   return lang === "zh" ? PERSONAL_YEAR_WORD_ZH[n] ?? enWord : enWord;
 }
 
-const LIFE_PATH_ZH: Record<number, string> = {
-  1: "獨立、開拓、自我定義",
-  2: "合作、圓融、細膩敏感",
-  3: "表達、創造、溝通",
-  4: "結構、堅忍、奠定根基",
-  5: "自由、變化、多元歷練",
-  6: "關懷、責任、家的和諧",
-  7: "探問、內省、內在知識",
-  8: "抱負、掌理權力與資源",
-  9: "圓成、慈悲、服務眾生",
-  11: "直覺、啟發、照亮他人",
-  22: "大匠築夢、化宏願為現實",
-  33: "大師之師、以奉獻療癒",
-};
-
 export function lifePathLabel(lang: Lang, n: number, enText: string): string {
-  return lang === "zh" ? LIFE_PATH_ZH[n] ?? enText : enText;
+  return lang === "zh" ? LIFE_PATH_THEMES_ZH[n] ?? enText : enText;
 }
-
-// branch relation — short note for tooltips / facts
-const RELATION_ZH: Record<BranchRelation, string> = {
-  self: "本命年——關卡之年，行事宜審慎、護根基",
-  trine: "三合之年——貴人與機緣較易流向你",
-  clash: "相沖之年——摩擦逼你行動；主動規劃變動，勿被迫應變",
-  harm: "相害之年——留意誤會與關係中悄然的損耗",
-  combine: "六合之年——利於合作；助力藉由夥伴而來",
-  neutral: "中性之年——成果依努力而定，非關天時",
-};
 
 const RELATION_SHORT_ZH: Record<BranchRelation, string> = {
   self: "本命年",
@@ -432,11 +361,11 @@ const RELATION_SHORT_ZH: Record<BranchRelation, string> = {
   clash: "相沖",
   harm: "相害",
   combine: "六合",
-  neutral: "中性",
+  neutral: "平順",
 };
 
 export function relationNote(lang: Lang, rel: BranchRelation, enNote: string): string {
-  return lang === "zh" ? RELATION_ZH[rel] : enNote;
+  return lang === "zh" ? RELATION_NOTES_ZH[rel] : enNote;
 }
 
 export function relationShort(lang: Lang, rel: BranchRelation, enShort: string): string {

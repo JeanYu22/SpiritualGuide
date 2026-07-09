@@ -14,16 +14,18 @@ export type AspectId = "career" | "wealth" | "relationships" | "health" | "growt
 export interface Aspect {
   id: AspectId;
   name: string;
+  /** Traditional Chinese name */
+  nameZh: string;
   /** categorical palette slot 1-8 */
   slot: number;
 }
 
 export const ASPECTS: Aspect[] = [
-  { id: "career", name: "Career & Purpose", slot: 1 },
-  { id: "wealth", name: "Wealth & Resources", slot: 2 },
-  { id: "relationships", name: "Relationships", slot: 3 },
-  { id: "health", name: "Health & Vitality", slot: 4 },
-  { id: "growth", name: "Growth & Wisdom", slot: 5 },
+  { id: "career", name: "Career & Purpose", nameZh: "事業與志向", slot: 1 },
+  { id: "wealth", name: "Wealth & Resources", nameZh: "財富與資源", slot: 2 },
+  { id: "relationships", name: "Relationships", nameZh: "感情關係", slot: 3 },
+  { id: "health", name: "Health & Vitality", nameZh: "健康與活力", slot: 4 },
+  { id: "growth", name: "Growth & Wisdom", nameZh: "成長與智慧", slot: 5 },
 ];
 
 export interface TransitPoint {

@@ -93,3 +93,40 @@ export const RELATION_NOTES: Record<BranchRelation, string> = {
   combine: "combination year — cooperation is favored; help arrives through partnership",
   neutral: "a neutral year — outcomes follow effort more than weather",
 };
+
+export const RELATION_NOTES_ZH: Record<BranchRelation, string> = {
+  self: "本命年（值太歲）——關卡之年；行事宜審慎，護守根基",
+  trine: "三合之年——貴人與機緣更容易向你匯聚",
+  clash: "沖太歲之年——摩擦逼動變化；宜主動規劃，而非被迫應變",
+  harm: "相害之年——留意誤會，與關係中悄然的耗損",
+  combine: "六合之年——利於合作；助力多經由夥伴而至",
+  neutral: "平順之年——成果多憑努力，而非天時",
+};
+
+export const ELEMENT_ZH: Record<Element, string> = {
+  Wood: "木",
+  Fire: "火",
+  Earth: "土",
+  Metal: "金",
+  Water: "水",
+};
+
+export const ANIMAL_ZH: Record<string, string> = {
+  Rat: "鼠",
+  Ox: "牛",
+  Tiger: "虎",
+  Rabbit: "兔",
+  Dragon: "龍",
+  Snake: "蛇",
+  Horse: "馬",
+  Goat: "羊",
+  Monkey: "猴",
+  Rooster: "雞",
+  Dog: "狗",
+  Pig: "豬",
+};
+
+/** Traditional-Chinese pillar label, e.g. "陰火蛇（丁巳）". */
+export function pillarLabelZh(p: YearPillar): string {
+  return `${p.yin ? "陰" : "陽"}${ELEMENT_ZH[p.element]}${ANIMAL_ZH[p.animal]}（${p.stem}${p.branch}）`;
+}
